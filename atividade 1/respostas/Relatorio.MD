@@ -482,3 +482,185 @@ Runtime error: division by zero
 O parser (`parse_expression()`, em `parser.c`) só verifica **estrutura**: quando ele encontra um token `T_IDENTIFIER`, ele aceita imediatamente e cria um nó `AST_VAR` com aquele nome — sem checar em nenhum lugar se essa variável já foi declarada antes. O parser não tem acesso a nenhuma tabela de símbolos; ele nem sabe que esse conceito existe. Do ponto de vista da gramática, `print(idade);` é 100% válido, com ou sem um `let idade = ...;` anterior.
 
 A tabela de símbolos só existe dentro do interpretador (`SymbolTable`, em `interpreter.c`), e ela só é populada em tempo de execução, conforme cada `AST_ASSIGN` é processado por `exec_statement()`. Ou seja, "a variável existe" não é uma propriedade da sintaxe do programa — é uma propriedade do **estado de execução** em um determinado momento. Por isso essa checagem só pode acontecer depois que o parsing termina e a AST já está pronta: é o interpretador, ao percorrer a árvore e tentar avaliar `AST_VAR(idade)` com `eval_expression()`, que consulta `lookup_symbol()` e só então descobre que aquele nome nunca foi definido. Isso é exatamente a diferença entre análise sintática (estrutura das frases) e análise semântica (significado/validade em contexto) — e aqui essa análise semântica é feita de forma bem simples, sem uma fase separada, misturada diretamente com a própria interpretação/execução.
+
+### Etapa 7:
+
+## 12 — Compilador ou interpretador?
+
+**Conclusão: o projeto é, atualmente, um interpretador — mais especificamente, um interpretador que percorre a árvore (*tree-walking interpreter*).** Não é um compilador nem um transpiler, no estado atual do código.
+
+### Justificativa técnica
+
+**O projeto não produz nenhum arquivo de saída.** Em `src/main.c`, a única chamada de `fopen` em todo o pipeline é dentro de `read_file()` (`src/utils.c`), e ela abre o arquivo em modo leitura (`"r"`) — para ler o código-fonte, não para escrever nada. Em nenhum lugar do código existe um `fopen(..., "w")`, `fwrite`, ou qualquer chamada que grave um arquivo `.exe`, `.o`, `.asm` ou similar. O único lugar onde o programa produz saída visível é via `printf`, direto no terminal (`stdout`) — o que é comportamento de execução, não de compilação.
+
+**Não gera assembly.** Não há, em nenhum arquivo do projeto, nenhuma estrutura de dados ou função voltada a emitir instruções de uma arquitetura (x86, ARM, etc.) — nenhuma tabela de opcodes, nenhuma geração de mnemônicos.
+
+**Não gera bytecode.** Também não existe nenhuma representação intermediária em formato de bytecode (como um array de instruções para uma máquina virtual) sendo produzida em nenhuma etapa do pipeline.
+
+**Não gera código C (não é transpiler).** Um transpiler pegaria a AST e escreveria como saída um novo arquivo-fonte em outra linguagem (ou até na mesma linguagem, reescrito). Isso também não acontece aqui — não existe nenhuma função que serialize a AST de volta como texto de código-fonte para gravar em disco. (A função `print_ast()`, em `parser.c`, imprime a AST no console para fins de depuração, mas isso é só um dump legível da árvore — não é código executável gerado, e nem é salvo em arquivo.)
+
+**O programa percorre a AST e calcula os resultados diretamente — essa é a evidência central de que é um interpretador.** Isso acontece explicitamente em `src/interpreter.c`:
+- `interpret(ASTNode* root)` percorre a lista de statements da AST (`while (current != NULL) { exec_statement(...); current = current->right; }`).
+- `exec_statement()` executa cada statement na hora — por exemplo, no caso `AST_PRINT`, ele já chama `printf("%d\n", value)` imediatamente, produzindo o efeito no mesmo momento em que aquele nó da árvore é visitado.
+- `eval_expression()` calcula o valor de cada expressão recursivamente e devolve um `int` — a soma, subtração, etc. são computadas em tempo real, usando a CPU que está rodando o próprio `mini-c.exe`, e não geram nenhuma instrução para ser executada depois por outra máquina.
+
+Ou seja: não existe uma fase de "tradução para outra representação, que depois é executada por outra coisa" (isso seria compilação/transpilação) — existe uma única fase, onde o código C do próprio interpretador (`eval_expression`, `exec_statement`) já produz o resultado final enquanto percorre a árvore.
+
+Vale registrar também que essa conclusão bate com o que os próprios autores do projeto documentam: o comentário no topo de `main()` já anuncia a etapa 3 como `"Interpretation (execute the AST) - to be implemented later"`, e o `README.md` do repositório descreve o projeto como um trabalho em andamento ("work-in-progress interpreter"), citando explicitamente planos futuros para "code generation capabilities" — ou seja, os próprios criadores reconhecem que, hoje, é um interpretador, e que geração de código (o que caracterizaria um compilador) é algo ainda não implementado.
+
+### Etapa 8:
+
+## 13 — Investigação de precedência e associatividade
+
+**Conclusão geral: o parser NÃO implementa precedência de operadores corretamente.** Ele não tem nenhuma tabela de precedência nem separação entre "nível de termo" (`*`, `/`) e "nível de expressão" (`+`, `-`), como um parser correto normalmente teria. Em `parse_expression()` (`src/parser.c`), todos os quatro operadores (`+ - * /`) são tratados dentro do mesmo laço `while`, sem distinção de prioridade. Além disso, o operando direito de cada operação é obtido chamando `parse_expression()` recursivamente de forma **completa** (`right = parse_expression(tokens, pos)`), não apenas o próximo número/variável — isso faz o parser **sempre agrupar para a direita**, seja qual for o operador. O resultado é: às vezes esse agrupamento à direita coincide com a precedência matemática correta (por acaso), e às vezes não — e nunca há associatividade à esquerda, nem para operadores como `-` e `/` que matematicamente exigem isso.
+
+### Teste A — `print(2 * 3 + 4);`
+
+Conteúdo:
+```
+print(2 * 3 + 4);
+```
+
+AST impressa:
+```
+AST_PRINT
+  AST_BINARY_OP(*)
+    AST_NUMBER(2)
+    AST_BINARY_OP(+)
+      AST_NUMBER(3)
+      AST_NUMBER(4)
+```
+
+Saída completa:
+```
+Source code:
+print(2 * 3 + 4);
+Tokens:
+PRINT
+NUMBER(2)
+MULT
+NUMBER(3)
+PLUS
+NUMBER(4)
+SEMICOLON
+EOF
+AST:
+AST_PRINT
+  AST_BINARY_OP(*)
+    AST_NUMBER(2)
+    AST_BINARY_OP(+)
+      AST_NUMBER(3)
+      AST_NUMBER(4)
+Program output:
+14
+```
+
+1. **Resultado obtido:** `14`
+2. **AST impressa:** acima — repare que o `*` (que deveria ter prioridade maior) ficou como nó raiz, com o `+` inteiro como seu operando direito: `2 * (3 + 4)`.
+3. **Comparação com o esperado:** o esperado pela aritmética convencional era `10` (`(2*3)+4`). O parser produziu `14` (`2*(3+4)`). **Resultado incorreto.**
+4. **Ordem adotada pelo parser:** o parser lê `2`, encontra o operador `*`, e chama `parse_expression()` recursivamente para o que vem depois — essa chamada recursiva não para no próximo número, ela consome a expressão inteira que sobrou (`3 + 4`), formando `AST_BINARY_OP(+)` primeiro, e só depois esse resultado vira o filho direito do `*`. Ou seja, o parser simplesmente agrupa da esquerda pra direita "no sentido inverso" (o último operador encontrado na leitura acaba ficando mais interno na árvore, e o primeiro operador lido vira a raiz — mas com o restante inteiro como seu operando direito).
+5. **Existe problema:** sim — **erro de precedência**. O `*` deveria "prender" só o `3`, e o `+ 4` deveria ser aplicado depois, sobre o resultado do `2*3`. Em vez disso, o `+` "rouba" o `3` e o `4` pra formar sua própria subexpressão antes do `*` conseguir se aplicar.
+
+### Teste B — `print(10 - 3 - 2);`
+
+Conteúdo:
+```
+print(10 - 3 - 2);
+```
+
+AST impressa:
+```
+AST_PRINT
+  AST_BINARY_OP(-)
+    AST_NUMBER(10)
+    AST_BINARY_OP(-)
+      AST_NUMBER(3)
+      AST_NUMBER(2)
+```
+
+Saída completa:
+```
+Source code:
+print(10 - 3 - 2);
+Tokens:
+PRINT
+NUMBER(10)
+MINUS
+NUMBER(3)
+MINUS
+NUMBER(2)
+SEMICOLON
+EOF
+AST:
+AST_PRINT
+  AST_BINARY_OP(-)
+    AST_NUMBER(10)
+    AST_BINARY_OP(-)
+      AST_NUMBER(3)
+      AST_NUMBER(2)
+Program output:
+9
+```
+
+1. **Resultado obtido:** `9`
+2. **AST impressa:** acima — o segundo `-` ficou aninhado como filho direito do primeiro: `10 - (3 - 2)`.
+3. **Comparação com o esperado:** o esperado pela associatividade convencional (operadores de mesmo nível se agrupam da esquerda pra direita) era `5` (`(10-3)-2`). O parser produziu `9` (`10-(3-2)`). **Resultado incorreto.**
+4. **Ordem adotada pelo parser:** igual ao Teste A — ao encontrar o primeiro `-`, o parser chama `parse_expression()` recursivamente para tudo que sobra (`3 - 2`), que forma sua própria subtração antes de virar o operando direito do primeiro `-`. O parser é, na prática, **associativo à direita** para todos os operadores, quando o correto para `+ - * /` é serem associativos à **esquerda**.
+5. **Existe problema:** sim — **erro de associatividade**. Para subtração e divisão, isso muda o resultado matematicamente (para `+` e `*`, associar à direita ou à esquerda dá o mesmo resultado numérico, já que são operações associativas; mas para `-` e `/`, não são, e por isso o erro aparece de forma bem visível aqui).
+
+### Teste C — `print(2 + 3 * 4);`
+
+Conteúdo:
+```
+print(2 + 3 * 4);
+```
+
+AST impressa:
+```
+AST_PRINT
+  AST_BINARY_OP(+)
+    AST_NUMBER(2)
+    AST_BINARY_OP(*)
+      AST_NUMBER(3)
+      AST_NUMBER(4)
+```
+
+Saída completa:
+```
+Source code:
+print(2 + 3 * 4);
+Tokens:
+PRINT
+NUMBER(2)
+PLUS
+NUMBER(3)
+MULT
+NUMBER(4)
+SEMICOLON
+EOF
+AST:
+AST_PRINT
+  AST_BINARY_OP(+)
+    AST_NUMBER(2)
+    AST_BINARY_OP(*)
+      AST_NUMBER(3)
+      AST_NUMBER(4)
+Program output:
+14
+```
+
+1. **Resultado obtido:** `14`
+2. **AST impressa:** acima — o `*` ficou aninhado como filho direito do `+`: `2 + (3 * 4)`.
+3. **Comparação com o esperado:** o esperado era `14` (`2 + (3*4)`). O parser produziu `14`. **Resultado bate com o esperado — mas por coincidência, não por precedência real** (ver explicação abaixo).
+4. **Ordem adotada pelo parser:** o parser lê `2`, encontra `+`, chama `parse_expression()` recursivamente para o restante (`3 * 4`), que forma o `AST_BINARY_OP(*)` primeiro e vira o operando direito do `+`. Nesse caso específico, a mesma estratégia de "sempre agrupar à direita" que causou erro nos Testes A e B aqui produziu o agrupamento correto — porque, por coincidência, o operador de maior precedência (`*`) apareceu depois do de menor precedência (`+`) na leitura da esquerda pra direita.
+5. **Existe problema:** não neste caso específico, mas **o motivo do resultado certo não é que o parser entende precedência** — é só que a ordem de leitura (menor precedência primeiro, maior precedência depois) coincidiu com o padrão de agrupamento à direita que o parser sempre aplica. Basta inverter a ordem (como no Teste A, `2 * 3 + 4`) para o erro aparecer.
+
+### Síntese
+
+| Teste | Expressão | Esperado | Obtido | Correto? |
+|---|---|---|---|---|
+| A | `2 * 3 + 4` | 10 | 14 | Não |
+| B | `10 - 3 - 2` | 5 | 9 | Não |
+| C | `2 + 3 * 4` | 14 | 14 | Sim (por coincidência) |
+
+O parser atual não implementa nem precedência de operadores (`*`/`/` deveriam ter prioridade sobre `+`/`-`) nem associatividade à esquerda — ele sempre agrupa as operações da direita para a esquerda, independente do operador. Isso só passa despercebido quando, por acaso, a ordem em que os operadores aparecem no código já bate com o agrupamento que o parser produz (como no Teste C). Esse é exatamente o tipo de limitação que a Etapa 8 pede pra identificar: o projeto **não está correto** nesse aspecto, apesar de compilar e rodar sem erros aparentes.
