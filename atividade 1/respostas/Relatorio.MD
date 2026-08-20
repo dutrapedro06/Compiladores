@@ -287,3 +287,198 @@ Syntax error: expected ')' at pos=7
 - **Mensagem apresentada:** `Syntax error: expected ')' at pos=7`
 - **Posição informada pelo parser:** `pos=7`, correspondente ao token `SEMICOLON` (índice 0=`PRINT`, 1=`LPAREN`, 2=`LPAREN`, 3=`NUMBER(10)`, 4=`PLUS`, 5=`NUMBER(5)`, 6=`RPAREN`, 7=`SEMICOLON`) — o único `)` presente fechou o `(` mais interno, e o parser esperava um segundo `)` para fechar o primeiro `(`, mas encontrou `;` no lugar.
 - **Função responsável:** `parse_expression()`, em `src/parser.c`, no bloco `else if (current.type == T_LPAREN)`, na checagem `if (tokens->tokens[*pos].type != T_RPAREN)`.
+
+### Etapa 5: 
+
+## 10.1 — Atividade obrigatória
+
+Código usado:
+```
+let x = 5 + 3;
+print(x);
+```
+
+AST impressa pelo programa:
+```
+AST_ASSIGN(x)
+  AST_BINARY_OP(+)
+    AST_NUMBER(5)
+    AST_NUMBER(3)
+```
+
+Saída completa do programa (para referência):
+```
+Source code:
+let x = 5 + 3;
+print(x);
+Tokens:
+LET
+IDENT(x)
+EQUAL
+NUMBER(5)
+PLUS
+NUMBER(3)
+SEMICOLON
+PRINT
+IDENT(x)
+SEMICOLON
+EOF
+AST:
+AST_ASSIGN(x)
+  AST_BINARY_OP(+)
+    AST_NUMBER(5)
+    AST_NUMBER(3)
+Program output:
+8
+```
+
+### Análise da árvore
+
+**Qual nó representa a atribuição:** o nó raiz `AST_ASSIGN(x)`, do tipo `AST_ASSIGN` na enum `ASTNodeType`. Ele é criado em `parse_statement()` (`src/parser.c`) quando o parser reconhece o padrão `let IDENTIFICADOR = EXPRESSAO ;`.
+
+**Onde o nome `x` é armazenado:** no campo `char name[32]` da própria struct `ASTNode`. Em `parser.c`, isso acontece na chamada `create_node(AST_ASSIGN, 0, var.name, expr, NULL)`, onde `var.name` é o nome capturado do token `T_IDENTIFIER` logo após o `let`.
+
+**Quais nós representam os números:** os dois nós-folha `AST_NUMBER(5)` e `AST_NUMBER(3)`, do tipo `AST_NUMBER`. Cada um guarda seu valor no campo `int value` da struct (o campo `name` fica vazio, já que não se aplica a números).
+
+**Qual nó representa a soma:** o nó `AST_BINARY_OP(+)`, do tipo `AST_BINARY_OP`. O caractere do operador (`+`) fica armazenado no campo `int value` (o `char` é implicitamente convertido para `int` ao ser salvo).
+
+**Como os ponteiros `left` e `right` são utilizados:** o uso muda de acordo com o tipo do nó. Em `AST_BINARY_OP`, `left` aponta para o operando esquerdo (`AST_NUMBER(5)`) e `right` para o operando direito (`AST_NUMBER(3)`) — os dois são realmente filhos da operação. Já em `AST_ASSIGN`, apenas `left` é usado, apontando para a subexpressão atribuída (o `AST_BINARY_OP(+)`); o campo `right` nesse nó não representa um filho da atribuição, e sim o **próximo statement do programa** — é assim que `parse()` encadeia múltiplas instruções numa lista ligada (`AST_ASSIGN(x).right` aponta para o nó `AST_PRINT` gerado por `print(x);`).
+
+**Observação importante:** por isso, a AST impressa acima mostra só o `AST_ASSIGN(x)` e sua subárvore — o `print(x);` existe na memória (e é executado corretamente pelo interpretador, daí a saída `8`), mas a função `print_ast()` não segue o ponteiro `right` do nó `AST_ASSIGN` para imprimi-lo. Ela só percorre `right` dentro do caso `AST_BINARY_OP` (para o operando direito), não no caso `AST_ASSIGN` (statement seguinte). Ou seja, `print_ast()` tem uma limitação: ela imprime corretamente a árvore de expressão de cada statement individual, mas não visualiza a cadeia de statements do programa inteiro.
+
+### Representação em Mermaid
+
+```mermaid
+graph TD
+    A["AST_ASSIGN: x"] --> B["AST_BINARY_OP: +"]
+    B --> C["AST_NUMBER: 5"]
+    B --> D["AST_NUMBER: 3"]
+```
+
+Diagrama alternativo, mostrando também a ligação (via `right`) com o próximo statement do programa — o `print(x);`, que não aparece na saída de `print_ast()`:
+
+```mermaid
+graph TD
+    A["AST_ASSIGN: x"] -->|left| B["AST_BINARY_OP: +"]
+    B -->|left| C["AST_NUMBER: 5"]
+    B -->|right| D["AST_NUMBER: 3"]
+    A -.->|right - próximo statement| E["AST_PRINT"]
+    E -->|left| F["AST_VAR: x"]
+```
+
+### Etapa 6:
+
+## 11.1 — O que foi explicado
+
+**`interpret(ASTNode* root)`** é o ponto de entrada do interpretador. Ele inicializa a tabela de símbolos com `init_symbol_table()` e percorre a lista de statements da AST através de um laço `while (current != NULL)`, chamando `exec_statement()` para cada nó e avançando com `current = current->right`. É esse `right` que encadeia `let idade = 30;` com o `print(idade);` seguinte — como vimos na Etapa 5, não é um filho de expressão, é o "próximo comando".
+
+**`exec_statement(ASTNode* node, SymbolTable* table)`** decide o que fazer de acordo com o tipo do nó: se for `AST_ASSIGN`, avalia a expressão à direita do `=` com `eval_expression()` e guarda o resultado na tabela com `set_symbol()`; se for `AST_PRINT`, avalia a expressão e imprime o valor com `printf("%d\n", value)`. Statements soltos (`AST_NUMBER`, `AST_VAR`, `AST_BINARY_OP` sem atribuição nem print) também são aceitos — são avaliados, mas o resultado é descartado.
+
+**`eval_expression(ASTNode* node, SymbolTable* table)`** calcula o valor de qualquer nó de expressão, de forma recursiva. Números (`AST_NUMBER`) retornam seu próprio valor; variáveis (`AST_VAR`) chamam `lookup_symbol()` pra buscar o valor atual na tabela; operações binárias (`AST_BINARY_OP`) avaliam recursivamente `node->left` e `node->right` primeiro, e só depois aplicam o operador (`+ - * /`) sobre os dois resultados — inclusive com a checagem de divisão por zero.
+
+**`set_symbol(SymbolTable* table, const char* name, int value)`** insere ou atualiza uma variável: percorre a tabela procurando um símbolo com o mesmo nome; se achar, atualiza o valor; se não achar, adiciona uma entrada nova na próxima posição livre (`table->count`) — mas só se `table->count < 128`, senão gera `"Runtime error: symbol table overflow"` e encerra.
+
+**`lookup_symbol(SymbolTable* table, const char* name)`** consulta o valor de uma variável: percorre a tabela procurando o nome; se achar, retorna o valor; se não achar, imprime `"Runtime error: undefined variable '%s'"` e encerra o programa com `exit(1)`.
+
+**A tabela tem capacidade fixa para 128 símbolos:** a struct `SymbolTable` (em `interpreter.h`) tem `Symbol symbols[128]` — um array de tamanho fixo, sem realloc. É uma limitação parecida com a dos 128 tokens do lexer, mas aqui, diferente do lexer, existe uma checagem explícita (`if (table->count < 128)`) antes de escrever — ou seja, o overflow é tratado com uma mensagem de erro controlada, e não um estouro de buffer silencioso como acontecia em `lex()`.
+
+## 11.2 — Testes obrigatórios
+
+### Variável definida — `testes/08_variavel_definida.txt`
+
+Conteúdo:
+```
+let idade = 30;
+print(idade);
+```
+
+Saída:
+```
+Source code:
+let idade = 30;
+print(idade);
+Tokens:
+LET
+IDENT(idade)
+EQUAL
+NUMBER(30)
+SEMICOLON
+PRINT
+IDENT(idade)
+SEMICOLON
+EOF
+AST:
+AST_ASSIGN(idade)
+  AST_NUMBER(30)
+Program output:
+30
+```
+
+- **Classificação:** não é erro — caso de controle, confirma que declaração e uso de variável funcionam corretamente. Código de saída: `0`.
+
+### Variável não definida — `testes/09_variavel_indefinida.txt`
+
+Conteúdo:
+```
+print(idade);
+```
+
+Saída:
+```
+Source code:
+print(idade);
+Tokens:
+PRINT
+IDENT(idade)
+SEMICOLON
+EOF
+AST:
+AST_PRINT
+  AST_VAR(idade)
+Program output:
+Runtime error: undefined variable 'idade'
+```
+
+- **Classificação:** erro semântico detectado durante a execução. O código é léxica e sintaticamente válido — `print(idade);` bate perfeitamente com a gramática (`print ( EXPRESSAO ) ;`, onde `EXPRESSAO` pode ser um identificador) — por isso o lexer e o parser não acusam nada, e a AST é montada normalmente com `AST_VAR(idade)`. O erro só aparece quando o interpretador tenta *avaliar* essa variável, em `eval_expression()`, e chama `lookup_symbol()`, que não encontra "idade" na tabela (porque nenhum `let idade = ...` foi executado antes). Código de saída: `1`.
+
+### Divisão por zero — `testes/10_divisao_zero.txt`
+
+Conteúdo:
+```
+let resultado = 10 / 0;
+print(resultado);
+```
+
+Saída:
+```
+Source code:
+let resultado = 10 / 0;
+print(resultado);
+Tokens:
+LET
+IDENT(resultado)
+EQUAL
+NUMBER(10)
+DIV
+NUMBER(0)
+SEMICOLON
+PRINT
+IDENT(resultado)
+SEMICOLON
+EOF
+AST:
+AST_ASSIGN(resultado)
+  AST_BINARY_OP(/)
+    AST_NUMBER(10)
+    AST_NUMBER(0)
+Program output:
+Runtime error: division by zero
+```
+
+- **Classificação:** outro erro de execução (erro aritmético em tempo de execução). Diferente da variável indefinida, aqui não há violação de nenhuma regra de "significado" do programa (a variável existe, os tipos batem, a expressão é bem formada) — o problema é puramente numérico e só existe por causa dos valores específicos usados (`10 / 0`). A checagem acontece dentro de `eval_expression()`, no `case '/'`, com `if (right_val == 0)`, antes de fazer a divisão de fato. Código de saída: `1`.
+
+### Por que a variável indefinida só é detectada pelo interpretador, e não pelo parser
+
+O parser (`parse_expression()`, em `parser.c`) só verifica **estrutura**: quando ele encontra um token `T_IDENTIFIER`, ele aceita imediatamente e cria um nó `AST_VAR` com aquele nome — sem checar em nenhum lugar se essa variável já foi declarada antes. O parser não tem acesso a nenhuma tabela de símbolos; ele nem sabe que esse conceito existe. Do ponto de vista da gramática, `print(idade);` é 100% válido, com ou sem um `let idade = ...;` anterior.
+
+A tabela de símbolos só existe dentro do interpretador (`SymbolTable`, em `interpreter.c`), e ela só é populada em tempo de execução, conforme cada `AST_ASSIGN` é processado por `exec_statement()`. Ou seja, "a variável existe" não é uma propriedade da sintaxe do programa — é uma propriedade do **estado de execução** em um determinado momento. Por isso essa checagem só pode acontecer depois que o parsing termina e a AST já está pronta: é o interpretador, ao percorrer a árvore e tentar avaliar `AST_VAR(idade)` com `eval_expression()`, que consulta `lookup_symbol()` e só então descobre que aquele nome nunca foi definido. Isso é exatamente a diferença entre análise sintática (estrutura das frases) e análise semântica (significado/validade em contexto) — e aqui essa análise semântica é feita de forma bem simples, sem uma fase separada, misturada diretamente com a própria interpretação/execução.
