@@ -71,13 +71,13 @@ No código específico não existe nenhum comando para liberar a memória que fo
 ### Teste válido — `testes/01_lexico_valido.txt`
 
 Conteúdo do arquivo:
-\`\`\`
+```
 let valor1 = 123 + 4;
 print(valor1);
-\`\`\`
+```
 
 Saída do programa:
-\`\`\`
+```
 Source code:
 let valor1 = 123 + 4;
 print(valor1);
@@ -100,21 +100,21 @@ AST_ASSIGN(valor1)
     AST_NUMBER(4)
 Program output:
 127
-\`\`\`
+```
 
 ### Teste inválido — `testes/02_lexico_invalido.txt`
 
 Conteúdo do arquivo:
-\`\`\`
+```
 let valor = 10 @ 2;
-\`\`\`
+```
 
 Saída do programa:
-\`\`\`
+```
 Source code:
 let valor = 10 @ 2;
 Unknown character: @
-\`\`\`
+```
 
 - **Mensagem produzida:** `Unknown character: @`
 - **Caractere que causou o erro:** `@`
