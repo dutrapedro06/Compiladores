@@ -150,3 +150,140 @@ Sim. Logo no início de `lex()`, a lista é alocada com `malloc(128 * sizeof(Tok
 **7. O que pode ocorrer se o programa gerar mais de 128 tokens?**
 
 Um estouro de buffer (buffer overflow): a linha `list.tokens[list.count++] = ...` escreveria além do espaço alocado, corrompendo memória adjacente no heap. Isso é comportamento indefinido em C — pode causar desde um crash até corrupção silenciosa de dados, sem que o programa emita qualquer aviso ou erro tratado.
+
+### Etapa 4:
+
+## 9.1 — Formas reconhecidas
+
+O parser confirma as formas do enunciado. A função `parse_statement()` trata `T_LET` (declaração: espera um IDENTIFICADOR, depois `=`, depois uma expressão via `parse_expression()`, depois `;`) e `T_PRINT` (espera uma expressão e depois `;`). Já `parse_expression()` trata números (`T_NUMBER`), identificadores (`T_IDENTIFIER`), expressões entre parênteses (`T_LPAREN ... T_RPAREN`, de forma recursiva) e operadores binários `+ - * /` em um laço `while`. Todo nó da AST é criado pela função `create_node()`, que aloca um `ASTNode` e preenche tipo, valor, nome e ponteiros para filho esquerdo/direito.
+
+Uma observação importante: no `print`, o código não verifica explicitamente `(` e `)` — ele apenas chama `parse_expression()`, que trata o `(` como parte da regra genérica de expressão entre parênteses. Ou seja, na prática, tanto `print(x);` quanto `print x;` são aceitos pelo parser, já que o parêntese não é obrigatoriamente exigido pela regra de `print` em si.
+
+## 9.2 — Testes sintáticos obrigatórios
+
+### Teste válido — `testes/03_sintatico_valido.txt`
+
+Conteúdo do arquivo:
+```
+let resultado = (10 + 5) * 2;
+print(resultado);
+```
+
+Saída do programa:
+```
+Source code:
+let resultado = (10 + 5) * 2;
+print(resultado);
+Tokens:
+LET
+IDENT(resultado)
+EQUAL
+NUMBER(10)
+PLUS
+NUMBER(5)
+MULT
+NUMBER(2)
+SEMICOLON
+PRINT
+IDENT(resultado)
+SEMICOLON
+EOF
+AST:
+AST_ASSIGN(resultado)
+  AST_BINARY_OP(*)
+    AST_BINARY_OP(+)
+      AST_NUMBER(10)
+      AST_NUMBER(5)
+    AST_NUMBER(2)
+Program output:
+30
+```
+
+- **Resultado esperado:** parsing bem-sucedido, respeitando a precedência imposta pelos parênteses — `(10 + 5) * 2 = 30`.
+- **Resultado observado:** exatamente isso. AST corretamente estruturada e saída `30`. Código de saída: `0`.
+- **Mensagem apresentada:** nenhuma (execução sem erros).
+- **Posição informada pelo parser:** não aplicável (sem erro).
+- **Função responsável:** `parse_statement()` e `parse_expression()`, em `src/parser.c`, processaram a entrada sem disparar nenhuma checagem de erro.
+
+### Teste sem `=` — `testes/04_sem_igual.txt`
+
+Conteúdo do arquivo:
+```
+let resultado 10 + 5;
+```
+
+Saída do programa:
+```
+Source code:
+let resultado 10 + 5;
+Tokens:
+LET
+IDENT(resultado)
+NUMBER(10)
+PLUS
+NUMBER(5)
+SEMICOLON
+EOF
+Syntax error: expected '=' at pos=2
+```
+
+- **Resultado esperado:** erro sintático, já que falta o `=` entre o identificador e a expressão.
+- **Resultado observado:** o programa encerra com código de saída `1`, sem montar a AST.
+- **Mensagem apresentada:** `Syntax error: expected '=' at pos=2`
+- **Posição informada pelo parser:** `pos=2`, correspondente ao token `NUMBER(10)` (índice 0=`LET`, 1=`IDENT(resultado)`, 2=`NUMBER(10)`) — o parser esperava `=` nessa posição e encontrou um número.
+- **Função responsável:** `parse_statement()`, em `src/parser.c`, no bloco `if (current.type == T_LET)`, na checagem `if (tokens->tokens[*pos].type != T_EQUAL)`.
+
+### Teste sem `;` — `testes/05_sem_ponto_virgula.txt`
+
+Conteúdo do arquivo:
+```
+let resultado = 10 + 5
+```
+
+Saída do programa:
+```
+Source code:
+let resultado = 10 + 5
+Tokens:
+LET
+IDENT(resultado)
+EQUAL
+NUMBER(10)
+PLUS
+NUMBER(5)
+EOF
+Syntax error: expected ';' at pos=6
+```
+
+- **Resultado esperado:** erro sintático por falta do `;` ao final da instrução.
+- **Resultado observado:** o programa encerra com código de saída `1` logo após montar a expressão `10 + 5`.
+- **Mensagem apresentada:** `Syntax error: expected ';' at pos=6`
+- **Posição informada pelo parser:** `pos=6`, correspondente ao token `EOF` (índice 0=`LET`, 1=`IDENT`, 2=`EQUAL`, 3=`NUMBER(10)`, 4=`PLUS`, 5=`NUMBER(5)`, 6=`EOF`) — o parser consumiu toda a expressão e chegou ao fim da lista de tokens sem encontrar o `;` esperado.
+- **Função responsável:** `parse_statement()`, em `src/parser.c`, no bloco `if (current.type == T_LET)`, na checagem `if (tokens->tokens[*pos].type != T_SEMICOLON)` logo após `parse_expression()`.
+
+### Teste com parêntese incompleto — `testes/06_parentese_incompleto.txt`
+
+Conteúdo do arquivo:
+```
+print((10 + 5);
+```
+
+Saída do programa:
+```
+Source code:
+print((10 + 5);
+Tokens:
+PRINT
+NUMBER(10)
+PLUS
+NUMBER(5)
+SEMICOLON
+EOF
+Syntax error: expected ')' at pos=7
+```
+
+- **Resultado esperado:** erro sintático, pois há dois `(` abertos mas apenas um `)` fechando.
+- **Resultado observado:** o programa encerra com código de saída `1`. Vale notar que a lista de tokens impressa não mostra os parênteses — isso é um detalhe à parte: a função `print_tokens()` em `lexer.c` não tem `case` para `T_LPAREN`/`T_RPAREN` no seu `switch`, então eles são tokenizados corretamente (o parser os usa normalmente), só não aparecem na listagem de depuração.
+- **Mensagem apresentada:** `Syntax error: expected ')' at pos=7`
+- **Posição informada pelo parser:** `pos=7`, correspondente ao token `SEMICOLON` (índice 0=`PRINT`, 1=`LPAREN`, 2=`LPAREN`, 3=`NUMBER(10)`, 4=`PLUS`, 5=`NUMBER(5)`, 6=`RPAREN`, 7=`SEMICOLON`) — o único `)` presente fechou o `(` mais interno, e o parser esperava um segundo `)` para fechar o primeiro `(`, mas encontrou `;` no lugar.
+- **Função responsável:** `parse_expression()`, em `src/parser.c`, no bloco `else if (current.type == T_LPAREN)`, na checagem `if (tokens->tokens[*pos].type != T_RPAREN)`.
