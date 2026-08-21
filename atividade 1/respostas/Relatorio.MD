@@ -664,3 +664,67 @@ Program output:
 | C | `2 + 3 * 4` | 14 | 14 | Sim (por coincidência) |
 
 O parser atual não implementa nem precedência de operadores (`*`/`/` deveriam ter prioridade sobre `+`/`-`) nem associatividade à esquerda — ele sempre agrupa as operações da direita para a esquerda, independente do operador. Isso só passa despercebido quando, por acaso, a ordem em que os operadores aparecem no código já bate com o agrupamento que o parser produz (como no Teste C). Esse é exatamente o tipo de limitação que a Etapa 8 pede pra identificar: o projeto **não está correto** nesse aspecto, apesar de compilar e rodar sem erros aparentes.
+
+### Etapa 9:
+
+## 14.1 — Modificação individual: correção de precedência e associatividade dos operadores (opções 9 e 10)
+
+### Problema ou limitação escolhida
+
+O parser original (`parse_expression()`, em `src/parser.c`) tratava todos os operadores (`+ - * /`) dentro de um único laço `while`, sem distinção de nível de precedência, e obtinha o operando direito de cada operação através de uma chamada recursiva completa a `parse_expression()`. Isso causava dois defeitos, ambos identificados e documentados com testes reais na Etapa 8: (1) nenhuma precedência real entre `*`/`/` e `+`/`-`; (2) associatividade sempre à direita, mesmo para operadores que matematicamente exigem associatividade à esquerda (`-` e `/`).
+
+### Comportamento anterior
+
+- `print(2 * 3 + 4);` produzia `14` (calculado como `2 * (3 + 4)`), quando o correto é `10` (`(2*3) + 4`).
+- `print(10 - 3 - 2);` produzia `9` (calculado como `10 - (3 - 2)`), quando o correto é `5` (`(10-3) - 2`).
+- `print(2 + 3 * 4);` já produzia `14` corretamente, mas por coincidência da ordem de leitura, não por respeitar precedência de fato.
+
+### Comportamento desejado
+
+Que expressões com múltiplos operadores sejam avaliadas respeitando a precedência convencional da aritmética (`*`/`/` antes de `+`/`-`) e a associatividade à esquerda para operadores de mesmo nível, do jeito que qualquer calculadora ou linguagem de programação convencional faz.
+
+### Arquivos alterados
+
+- `src/parser.c` (única alteração de código-fonte necessária).
+
+### Funções alteradas ou criadas
+
+- **Removida:** a função `parse_expression()` original, que tratava todos os operadores no mesmo nível.
+- **Criadas:** `parse_factor()` (analisa números, identificadores e expressões entre parênteses — o nível de maior precedência) e `parse_term()` (analisa `*` e `/`, chamando `parse_factor()` para cada operando).
+- **Reescrita:** `parse_expression()` agora analisa apenas `+` e `-`, chamando `parse_term()` para cada operando, em vez de fazer tudo sozinha.
+- Nenhuma outra função do projeto precisou ser alterada — `parse_statement()`, `create_node()`, `parse()`, `print_ast()`, o lexer e o interpretador continuam exatamente iguais, já que a interface pública de `parse_expression()` (nome, assinatura, tipo de retorno) não mudou.
+
+### Decisões de implementação
+
+Optei pelo padrão clássico de *recursive descent com níveis de precedência* (`parse_expression → parse_term → parse_factor`), em vez de técnicas mais avançadas como precedência por tabela (precedence climbing/Pratt parsing), porque: (1) é o método mais didático e mais fácil de explicar e defender oralmente; (2) exige poucas mudanças estruturais no código já existente; (3) resolve os dois problemas (precedência e associatividade) na mesma alteração, já que a solução natural para "separar em níveis" também é o que corrige a associatividade — bastou trocar a chamada recursiva do operando direito (`right = parse_expression(...)`, que sempre "roubava" o resto da expressão) por um laço iterativo que acumula o resultado da esquerda para a direita a cada operador do mesmo nível.
+
+### Casos de teste
+
+Reaproveitei os 12 arquivos de teste criados nas etapas anteriores como **testes de regressão** (garantindo que a correção não quebrou nada que já funcionava), e adicionei um 13º caso novo, combinando os dois efeitos numa expressão só:
+
+| Teste | O que valida | Resultado após a correção |
+|---|---|---|
+| `01_lexico_valido` | lexer não foi afetado | idêntico a antes — `127` |
+| `02_lexico_invalido` | detecção de erro léxico intacta | idêntico a antes — `Unknown character: @`, exit 1 |
+| `03_sintatico_valido` | parênteses continuam funcionando | idêntico a antes — `30` |
+| `04_sem_igual` | erro sintático (`=`) intacto | idêntico a antes — `pos=2`, exit 1 |
+| `05_sem_ponto_virgula` | erro sintático (`;`) intacto | idêntico a antes — `pos=6`, exit 1 |
+| `06_parentese_incompleto` | erro sintático (`)`) intacto | idêntico a antes — `pos=7`, exit 1 |
+| `08_variavel_definida` | interpretação básica intacta | idêntico a antes — `30` |
+| `09_variavel_indefinida` | erro semântico em runtime intacto | idêntico a antes — erro de variável indefinida, exit 1 |
+| `10_divisao_zero` | erro de execução intacto | idêntico a antes — erro de divisão por zero, exit 1 |
+| `11_teste_a_precedencia` | precedência do `*` sobre o `+` | corrigido: antes dava `14`, agora dá `10` |
+| `12_teste_b_associatividade` | associatividade à esquerda do `-` | corrigido: antes dava `9`, agora dá `5` |
+| `13_teste_c_precedencia` | caso que já dava certo antes | continua `14`, agora por precedência real, não coincidência |
+| `14_precedencia_corrigida` | caso combinado: precedência e associatividade juntas, na mesma expressão | `20 - 4 - 2 * 3` → `10`, confirmando `(20-4) - (2*3)` |
+
+### Resultado obtido
+
+Os testes 01 a 10 confirmaram zero regressões — toda a análise léxica, sintática e de interpretação continua se comportando exatamente igual a antes da mudança. Os testes 11, 12 e 13 confirmaram a correção isoladamente: as ASTs impressas passaram a mostrar o operador de maior precedência (ou o operando mais à esquerda, entre operadores de mesmo nível) como filho **esquerdo** da árvore, em vez de filho direito.
+
+O teste adicional `14_precedencia_corrigida` (`20 - 4 - 2 * 3`) juntou os dois efeitos na mesma expressão, pra provar que funcionam corretamente em conjunto e não só separadamente. Ele deu o resultado esperado (`10`), e a AST gerada mostra exatamente essa combinação: o nó raiz é um `-`, cujo filho esquerdo é `(20 - 4)` (associatividade à esquerda aplicada entre os dois `-`) e cujo filho direito é `(2 * 3)` inteiro, tratado como uma única subexpressão de maior precedência (mesmo aparecendo depois do segundo `-` na leitura do código). Ou seja: o `*` "grudou" só no `2` e no `3`, sem se misturar com as subtrações, e as duas subtrações se agruparam da esquerda pra direita — exatamente o comportamento esperado de uma calculadora convencional.
+
+### Limitações que permaneceram
+
+A correção resolveu especificamente precedência e associatividade dos quatro operadores aritméticos existentes (`+ - * /`). Outras limitações identificadas ao longo do relatório continuam presentes e fora do escopo desta modificação: a lista de tokens do lexer continua com capacidade fixa de 128 sem `realloc` (Etapa 3); o lexer não registra linha/coluna (Etapa 3); `print_ast()` ainda não percorre a cadeia de statements via `right` em nós `AST_ASSIGN` (Etapa 5); e a linguagem continua sem suporte a números negativos, operadores relacionais, ou qualquer estrutura de controle (`if`/`while`).
+

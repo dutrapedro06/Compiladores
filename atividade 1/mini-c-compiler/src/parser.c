@@ -21,8 +21,15 @@ ASTNode* create_node(ASTNodeType type, int value, const char* name, ASTNode* lef
     return node;
 }
 
-/* Forward declaration of parse_expression for recursive calls */
+/* Forward declarations for recursive-descent parsing with precedence levels.
+ * Grammar (lowest to highest precedence):
+ *   parse_expression : parse_term ( ('+' | '-') parse_term )*
+ *   parse_term       : parse_factor ( ('*' | '/') parse_factor )*
+ *   parse_factor     : NUMBER | IDENTIFIER | '(' parse_expression ')'
+ */
 ASTNode* parse_expression(TokenList* tokens, int* pos);
+ASTNode* parse_term(TokenList* tokens, int* pos);
+ASTNode* parse_factor(TokenList* tokens, int* pos);
 
 /* 
  * Parses a statement (variable assignment, print, etc.)
@@ -110,62 +117,84 @@ ASTNode* parse_statement(TokenList* tokens, int* pos) {
     }
 }
 
-/* 
- * Parses simple binary expressions (numbers, variables, +, -, *, /)
+/*
+ * parse_factor: parses the smallest, highest-precedence pieces of an
+ * expression - a number, a variable, or a fully parenthesized sub-expression.
+ * This is where recursion back into parse_expression happens (for '(' ... ')'),
+ * which is what allows parentheses to override the normal precedence rules.
  */
-ASTNode* parse_expression(TokenList* tokens, int* pos) {
+ASTNode* parse_factor(TokenList* tokens, int* pos) {
     Token current = tokens->tokens[*pos];
-    ASTNode* left = NULL;
 
-    if (current.type == T_NUMBER) { // if token is a number (e.g. '5' in "5 + 3")
-        // left is a pointer to an AST node of type = AST_NUMBER; value contains the numeeric value read from the token (e.g. '5')
-        left = create_node(AST_NUMBER, current.value, NULL, NULL, NULL);
+    if (current.type == T_NUMBER) { // e.g. '5'
+        ASTNode* node = create_node(AST_NUMBER, current.value, NULL, NULL, NULL);
         (*pos)++;
-    } else if (current.type == T_IDENTIFIER) { // if token is a variable (e.g. 'x' in "x * 2") (it means that the expression contains a variable instead of a number)
-        left = create_node(AST_VAR, 0, current.name, NULL, NULL);
+        return node;
+    } else if (current.type == T_IDENTIFIER) { // e.g. 'x'
+        ASTNode* node = create_node(AST_VAR, 0, current.name, NULL, NULL);
         (*pos)++;
-    } else if (current.type == T_LPAREN) {  // if token is '('
-        (*pos)++; // skip the '(' token and move to the next one
+        return node;
+    } else if (current.type == T_LPAREN) { // '(' EXPRESSAO ')'
+        (*pos)++; // skip '('
 
-        // Recursively parse the expression inside the parentheses.
-        // This handles any valid sub-expression, including numbers, variables,
-        // binary operations, or even nested parentheses.
-        // The result is stored in 'left' as a subtree of the AST.
-        left = parse_expression(tokens, pos);
+        ASTNode* node = parse_expression(tokens, pos);
 
-        // After parsing the sub-expression, we expect a closing parenthesis ')'
-        // If the next token is not ')', it's a syntax error
         if (tokens->tokens[*pos].type != T_RPAREN) {
             printf("Syntax error: expected ')' at pos=%d\n", *pos);
             exit(1);
         }
-
-        (*pos)++;  // Skip the ')' token and continue parsing
+        (*pos)++; // skip ')'
+        return node;
     } else {
         printf("Syntax error: unexpected token at pos=%d\n", *pos);
         exit(1);
     }
+}
 
-    current = tokens->tokens[*pos];
-    while (current.type == T_PLUS || current.type == T_MINUS ||
-        current.type == T_MULT || current.type == T_DIV) {
+/*
+ * parse_term: handles '*' and '/', which bind tighter than '+' and '-'.
+ * Each operand is obtained via parse_factor (never via parse_expression),
+ * so a '+' or '-' appearing after this term is left for the caller
+ * (parse_expression) to handle - this is what enforces precedence.
+ *
+ * The loop is iterative (not recursive-right), so multiple '*'/'/' in a row
+ * are folded left-to-right: "a * b / c" becomes ((a * b) / c).
+ */
+ASTNode* parse_term(TokenList* tokens, int* pos) {
+    ASTNode* left = parse_factor(tokens, pos);
 
-        char op = 0;
-        switch (current.type) {
-            case T_PLUS: op = '+'; break;
-            case T_MINUS: op = '-'; break;
-            case T_MULT: op = '*'; break;
-            case T_DIV: op = '/'; break;
-        }
+    Token current = tokens->tokens[*pos];
+    while (current.type == T_MULT || current.type == T_DIV) {
+        char op = (current.type == T_MULT) ? '*' : '/';
         (*pos)++;
-        ASTNode* right = parse_expression(tokens, pos);
+        ASTNode* right = parse_factor(tokens, pos);
         left = create_node(AST_BINARY_OP, op, NULL, left, right);
         current = tokens->tokens[*pos];
     }
 
-    /* If no binary operator follows the current token, simply return the left node
-     * Example: a standalone number "5" will return AST_NUMBER(5) without further recursion
-     */
+    return left;
+}
+
+/*
+ * parse_expression: handles '+' and '-', the lowest-precedence operators.
+ * Each operand is obtained via parse_term, so any '*'/'/' inside it is
+ * already fully resolved into its own subtree before '+'/'-' are applied.
+ *
+ * Just like parse_term, this loop is iterative, giving '+'/'-' the same
+ * left-to-right associativity: "a - b - c" becomes ((a - b) - c).
+ */
+ASTNode* parse_expression(TokenList* tokens, int* pos) {
+    ASTNode* left = parse_term(tokens, pos);
+
+    Token current = tokens->tokens[*pos];
+    while (current.type == T_PLUS || current.type == T_MINUS) {
+        char op = (current.type == T_PLUS) ? '+' : '-';
+        (*pos)++;
+        ASTNode* right = parse_term(tokens, pos);
+        left = create_node(AST_BINARY_OP, op, NULL, left, right);
+        current = tokens->tokens[*pos];
+    }
+
     return left;
 }
 
