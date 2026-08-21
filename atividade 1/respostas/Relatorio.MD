@@ -567,6 +567,23 @@ Ou seja: não existe uma fase de "tradução para outra representação, que dep
 
 Vale registrar também que essa conclusão bate com o que os próprios autores do projeto documentam: o comentário no topo de `main()` já anuncia a etapa 3 como `"Interpretation (execute the AST) - to be implemented later"`, e o `README.md` do repositório descreve o projeto como um trabalho em andamento ("work-in-progress interpreter"), citando explicitamente planos futuros para "code generation capabilities" — ou seja, os próprios criadores reconhecem que, hoje, é um interpretador, e que geração de código (o que caracterizaria um compilador) é algo ainda não implementado.
 
+## Resultados dos testes
+
+Tabela consolidada dos 10 casos de teste mínimos exigidos. A saída real de cada um está disponível na pasta `evidencias/`.
+
+| ID | Entrada | Resultado esperado | Resultado obtido | Evidência | Situação |
+|---|---|---|---|---|---|
+| T01 | `examples/test.txt` (programa original do repositório) | Executa sem erro, calcula `x+y` corretamente → `10` | `10`, exit 0 | `evidencias/T01_programa_original.txt` | Aprovado |
+| T02 | `testes/02_lexico_invalido.txt` | Erro léxico: `Unknown character: @` | Idêntico, exit 1 | `evidencias/02_lexico_invalido.txt` | Aprovado |
+| T03 | `testes/04_sem_igual.txt` | Erro sintático: `expected '=' at pos=2` | Idêntico, exit 1 | `evidencias/04_sem_igual.txt` | Aprovado |
+| T04 | `testes/05_sem_ponto_virgula.txt` | Erro sintático: `expected ';' at pos=6` | Idêntico, exit 1 | `evidencias/05_sem_ponto_virgula.txt` | Aprovado |
+| T05 | `testes/06_parentese_incompleto.txt` | Erro sintático: `expected ')' at pos=7` | Idêntico, exit 1 | `evidencias/06_parentese_incompleto.txt` | Aprovado |
+| T06 | `testes/09_variavel_indefinida.txt` | Erro de execução: `Runtime error: undefined variable 'idade'` | Idêntico, exit 1 | `evidencias/09_variavel_indefinida.txt` | Aprovado |
+| T07 | `testes/10_divisao_zero.txt` | Erro de execução: `Runtime error: division by zero` | Idêntico, exit 1 | `evidencias/10_divisao_zero.txt` | Aprovado |
+| T08 | `testes/11_teste_a_precedencia.txt` (`2*3+4`) | `10` (após a correção da Etapa 9) | `10` | `evidencias/11_teste_a_precedencia.txt` | Aprovado |
+| T09 | `testes/12_teste_b_associatividade.txt` (`10-3-2`) | `5` (após a correção da Etapa 9) | `5` | `evidencias/12_teste_b_associatividade.txt` | Aprovado |
+| T10 | `testes/14_precedencia_corrigida.txt` (`20-4-2*3`) | `10`, validando a melhoria individual implementada | `10` | `evidencias/14_precedencia_corrigida.txt` | Aprovado |
+
 ### Etapa 8:
 
 ## 13 — Investigação de precedência e associatividade
