@@ -4,6 +4,8 @@
 #include <string.h>
 #include "../include/lexer.h"
 
+//2 problemas - o primeiro é que não guarda linha/coluna em lugar nenhum, então mensagens de erro léxico não dizem onde no arquivo o problema está.
+
 /*
  * Simple lexer for the Mini C Compiler
  * Converts source code string into a list of tokens.
@@ -26,14 +28,14 @@ Token create_token(TokenType type, int value, const char* name) {
 TokenList lex(const char* source) {
     TokenList list;
     list.tokens = malloc(128 * sizeof(Token)); // initial size, can grow
-    list.count = 0;
+    list.count = 0; // um dos problemas é que ele aloca 128 tokens, se for mais que isso causa um estouro de buffer
 
     int i = 0;
     while (source[i] != '\0') {
         char c = source[i];
 
         // Skip whitespace
-        if (isspace(c)) {
+        if (isspace(c)) { //pula os espaços 
             i++;
             continue;
         }
@@ -54,7 +56,7 @@ TokenList lex(const char* source) {
                  * second cycle: value = 1*10 + 2 = 12
                  * third cycle: value = 12*10 + 3 = 123
                  */
-                value = value * 10 + (source[i] - '0');
+                value = value * 10 + (source[i] - '0'); //caso seja um numero de 2 casas ou mais
                 // Move to the next character
                 i++;
             }
@@ -68,6 +70,7 @@ TokenList lex(const char* source) {
         }
 
         // Identifiers and keywords
+        //letras viram caractere, isalpha no primeiro e isalnum nos seguintes. (Se for let ou print vira uma palavra reservada)
         if (isalpha(c)) { // checks if c is a letter (a-z or A-Z)
             /*
              * Defines a temporary array where the characters of the word/identifier are stored
@@ -112,7 +115,7 @@ TokenList lex(const char* source) {
             case ')': list.tokens[list.count++] = create_token(T_RPAREN, 0, NULL); break;
             default:
                 printf("Unknown character: %c\n", c);
-                exit(1);
+                exit(1); //se não for nenhum desses caracteres fecha o programa e da print do caractere invalido
         }
         i++;
     }

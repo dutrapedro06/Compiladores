@@ -6,7 +6,7 @@
 /* 
  * Helper function to create a new AST node
  */
-ASTNode* create_node(ASTNodeType type, int value, const char* name, ASTNode* left, ASTNode* right) {
+ASTNode* create_node(ASTNodeType type, int value, const char* name, ASTNode* left, ASTNode* right) { // onde cria os nós da árvore
     ASTNode* node = (ASTNode*)malloc(sizeof(ASTNode));
     node->type = type;
     node->value = value;
@@ -27,14 +27,14 @@ ASTNode* create_node(ASTNodeType type, int value, const char* name, ASTNode* lef
  *   parse_term       : parse_factor ( ('*' | '/') parse_factor )*
  *   parse_factor     : NUMBER | IDENTIFIER | '(' parse_expression ')'
  */
-ASTNode* parse_expression(TokenList* tokens, int* pos);
+ASTNode* parse_expression(TokenList* tokens, int* pos); // as três expressões entendem uma expressão matemática 
 ASTNode* parse_term(TokenList* tokens, int* pos);
 ASTNode* parse_factor(TokenList* tokens, int* pos);
 
 /* 
- * Parses a statement (variable assignment, print, etc.)
+ * Parses a statement (variable assignment, print, etc.) reconhece uma instrução inteira (print, let, ...)
  */
-ASTNode* parse_statement(TokenList* tokens, int* pos) {
+ASTNode* parse_statement(TokenList* tokens, int* pos) { //recebe a lista de tokens inteira e a posição atual
     Token current = tokens->tokens[*pos];
 
     if (current.type == T_LET) { // if statement starts with 'let' -> e.g. let x = 5 + 3;
@@ -43,7 +43,7 @@ ASTNode* parse_statement(TokenList* tokens, int* pos) {
         (*pos)++; // move past variable token
 
         if (tokens->tokens[*pos].type != T_EQUAL) { // check for '='
-            printf("Syntax error: expected '=' at pos=%d\n", *pos);
+            printf("Syntax error: expected '=' at pos=%d\n", *pos); // se o token nao aparece na posicao especifica que era pra aparecer da erro e encerrar
             exit(1);
         }
         (*pos)++; // skip '='
@@ -52,7 +52,7 @@ ASTNode* parse_statement(TokenList* tokens, int* pos) {
          * parse the expression "5 + 3" 
          * returns AST_BINARY_OP(+) with left = AST_NUMBER(5), right = AST_NUMBER(3)
          */
-        ASTNode* expr = parse_expression(tokens, pos);
+        ASTNode* expr = parse_expression(tokens, pos); //terceiriza a parte de entender a conta matematica pra outra funcao
 
         if (tokens->tokens[*pos].type != T_SEMICOLON) { // expect ';' at the end of the statement
             printf("Syntax error: expected ';' at pos=%d\n", *pos);
@@ -71,7 +71,8 @@ ASTNode* parse_statement(TokenList* tokens, int* pos) {
          * - The computed expression (5 + 3) is the left child of the assignment node.
          * - The right child is NULL because it is not needed for assignments.
          */
-        return create_node(AST_ASSIGN, 0, var.name, expr, NULL);
+        return create_node(AST_ASSIGN, 0, var.name, expr, NULL); // monta o nó final, nome da variavel guardado antes, 
+        //o filho esquerdo é a expressão calculada, e o direito é NULL por enquanto (guardado para encadear o proximo let/print do programa)
 
     } else if (current.type == T_PRINT) { // if statement starts with 'print'
         (*pos)++; // move past 'print' keyword
@@ -123,8 +124,8 @@ ASTNode* parse_statement(TokenList* tokens, int* pos) {
  * This is where recursion back into parse_expression happens (for '(' ... ')'),
  * which is what allows parentheses to override the normal precedence rules.
  */
-ASTNode* parse_factor(TokenList* tokens, int* pos) {
-    Token current = tokens->tokens[*pos];
+ASTNode* parse_factor(TokenList* tokens, int* pos) { //me dá o próximo pedaço mais básico possível da expressão, e me diz onde ele termina.
+    Token current = tokens->tokens[*pos]; // reconhece numeros, variaveis e parenteses 
 
     if (current.type == T_NUMBER) { // e.g. '5'
         ASTNode* node = create_node(AST_NUMBER, current.value, NULL, NULL, NULL);
@@ -160,13 +161,13 @@ ASTNode* parse_factor(TokenList* tokens, int* pos) {
  * The loop is iterative (not recursive-right), so multiple '*'/'/' in a row
  * are folded left-to-right: "a * b / c" becomes ((a * b) / c).
  */
-ASTNode* parse_term(TokenList* tokens, int* pos) {
+ASTNode* parse_term(TokenList* tokens, int* pos) { // reconhece * e /, chamando parse_factor() pra cada operando.
     ASTNode* left = parse_factor(tokens, pos);
 
     Token current = tokens->tokens[*pos];
     while (current.type == T_MULT || current.type == T_DIV) {
-        char op = (current.type == T_MULT) ? '*' : '/';
-        (*pos)++;
+        char op = (current.type == T_MULT) ? '*' : '/'; //ela consome o operador, pede outra peça para o perse_factor e junta os numeros em um no
+        (*pos)++; //ex: 2 * 3 * 4 - ((2*3)*4)
         ASTNode* right = parse_factor(tokens, pos);
         left = create_node(AST_BINARY_OP, op, NULL, left, right);
         current = tokens->tokens[*pos];
@@ -183,10 +184,10 @@ ASTNode* parse_term(TokenList* tokens, int* pos) {
  * Just like parse_term, this loop is iterative, giving '+'/'-' the same
  * left-to-right associativity: "a - b - c" becomes ((a - b) - c).
  */
-ASTNode* parse_expression(TokenList* tokens, int* pos) {
+ASTNode* parse_expression(TokenList* tokens, int* pos) { //reescrita, reconhece só + e -, chamando parse_term() pra cada operando.
     ASTNode* left = parse_term(tokens, pos);
 
-    Token current = tokens->tokens[*pos];
+    Token current = tokens->tokens[*pos]; 
     while (current.type == T_PLUS || current.type == T_MINUS) {
         char op = (current.type == T_PLUS) ? '+' : '-';
         (*pos)++;
