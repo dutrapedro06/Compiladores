@@ -1,3 +1,63 @@
+# Relatório — Análise Individual do Mini C Compiler
+
+## Identificação do estudante
+
+- **Nome:** Pedro Dutra
+- **Turma/Instituição:** [preencher]
+- **Disciplina:** Compiladores
+- **Data de entrega:** [preencher]
+
+## Identificação do projeto original
+
+- **Nome do projeto:** Mini C Compiler
+- **Autor original:** Rino Di Paola (usuário GitHub: `ironrinox`)
+- **Repositório original:** https://github.com/ironrinox/mini-c-compiler
+- **Licença:** MIT License (Copyright (c) 2025 Rino Di Paola), preservada neste repositório no arquivo `LICENSE`
+- **Repositório individual (este trabalho):** https://github.com/dutrapedro06/Compiladores, código dentro de `atividade 1/mini-c-compiler/`
+
+## Objetivo da atividade
+
+Analisar tecnicamente o funcionamento interno do projeto Mini C Compiler — desde a leitura do arquivo-fonte até a interpretação da AST — documentando cada etapa do pipeline (leitura de arquivo, análise léxica, análise sintática, construção da AST, tabela de símbolos e interpretação), validando o comportamento observado com casos de teste próprios (válidos e inválidos), classificando corretamente a natureza do projeto (compilador, interpretador ou transpiler), identificando limitações reais do código através de testes práticos, e implementando e documentando uma melhoria individual sobre o projeto original.
+
+## Preparação do ambiente
+
+- **Sistema operacional:** Windows com WSL/Ubuntu
+- **Compilador:** GCC (GNU Compiler Collection), padrão do sistema
+- **Editor:** Visual Studio Code
+- **Controle de versão:** Git, repositório hospedado no GitHub (`dutrapedro06/Compiladores`)
+- Nenhuma dependência externa é necessária — o projeto é escrito em C puro (padrão da biblioteca C: `stdio.h`, `stdlib.h`, `string.h`, `ctype.h`), sem bibliotecas de terceiros.
+
+## Procedimento de compilação e execução
+
+Compilação (executado a partir da pasta `atividade 1/mini-c-compiler/`):
+```bash
+gcc src/main.c src/lexer.c src/parser.c src/interpreter.c src/utils.c -Iinclude -o mini-c.exe
+```
+
+Execução, passando um arquivo-fonte como argumento:
+```bash
+./mini-c.exe testes/NOME_DO_TESTE.txt
+```
+
+Todos os casos de teste usados neste relatório estão na pasta `testes/`, e as saídas reais de execução de cada um estão na pasta `evidencias/` (arquivos `T01.txt` a `T10.txt`).
+
+## Arquitetura e responsabilidades dos arquivos
+
+| Arquivo | Responsabilidade |
+|---|---|
+| `src/main.c` | Ponto de entrada do programa; orquestra o pipeline: leitura do arquivo → análise léxica → análise sintática → interpretação |
+| `src/utils.c` / `include/utils.h` | Leitura do arquivo-fonte para memória (`read_file`) |
+| `src/lexer.c` / `include/lexer.h` | Análise léxica: transforma o código-fonte em tokens (`lex`, `print_tokens`) |
+| `src/parser.c` / `include/parser.h` | Análise sintática: transforma os tokens em AST (`parse`, `parse_statement`, `parse_expression`, `parse_term`, `parse_factor`, `print_ast`) |
+| `src/interpreter.c` / `include/interpreter.h` | Tabela de símbolos e interpretação: percorre a AST e executa o programa (`interpret`, `exec_statement`, `eval_expression`) |
+| `testes/` | Casos de teste (entradas `.txt`) usados na validação de cada etapa |
+| `evidencias/` | Saídas reais de execução de cada teste obrigatório (T01–T10) |
+| `examples/` | Exemplo original herdado do repositório de origem |
+
+## Uso de ferramentas de IA
+
+Este trabalho foi desenvolvido com o auxílio de uma ferramenta de IA (Claude, da Anthropic), com uso autorizado pelo professor. A IA foi usada para: ler e explicar o código-fonte do projeto original; orientar a criação e execução dos casos de teste; auxiliar na identificação e documentação da limitação de precedência/associatividade (Etapa 8); e auxiliar na implementação da correção dessa limitação (Etapa 9, `parse_expression`/`parse_term`/`parse_factor`). Todas as saídas foram executadas e conferidas manualmente pelo estudante (evidências em `evidencias/` e ao longo deste relatório), o código-fonte final foi revisado linha a linha antes de ser incorporado ao repositório, e o estudante é capaz de explicar tecnicamente cada trecho de código, decisão de implementação e resultado apresentado neste relatório e durante a defesa oral.
+
 ### Etapa 1: 
 
 ## 1. Como o caminho do arquivo-fonte é recebido?
@@ -728,3 +788,25 @@ O teste adicional `14_precedencia_corrigida` (`20 - 4 - 2 * 3`) juntou os dois e
 
 A correção resolveu especificamente precedência e associatividade dos quatro operadores aritméticos existentes (`+ - * /`). Outras limitações identificadas ao longo do relatório continuam presentes e fora do escopo desta modificação: a lista de tokens do lexer continua com capacidade fixa de 128 sem `realloc` (Etapa 3); o lexer não registra linha/coluna (Etapa 3); `print_ast()` ainda não percorre a cadeia de statements via `right` em nós `AST_ASSIGN` (Etapa 5); e a linguagem continua sem suporte a números negativos, operadores relacionais, ou qualquer estrutura de controle (`if`/`while`).
 
+## Limitações encontradas
+
+Consolidação das limitações identificadas ao longo da análise, etapa por etapa:
+
+- **Lexer (`lex()`, Etapa 3):** a lista de tokens é alocada com `malloc(128 * sizeof(Token))` sem `realloc` — um programa com mais de 128 tokens causaria estouro de buffer (comportamento indefinido). O lexer também não registra linha/coluna, então mensagens de erro léxico não indicam onde no arquivo o problema ocorreu.
+- **Parser (Etapa 4):** o `print` aceita expressões com ou sem parênteses, mesmo a gramática documentada exigindo `print ( EXPRESSAO ) ;` — não é reforçado explicitamente no código.
+- **`print_ast()` (Etapa 5):** não percorre o ponteiro `right` de nós `AST_ASSIGN` (usado para encadear o próximo statement do programa), então a impressão da AST mostra só o primeiro statement de cada `print_ast()` chamado, não o programa inteiro.
+- **Tabela de símbolos (Etapa 6):** capacidade fixa de 128 variáveis (`Symbol symbols[128]`) — porém, diferente do lexer, esse limite é tratado com uma mensagem de erro controlada (`"Runtime error: symbol table overflow"`), não um estouro silencioso.
+- **Detecção de erros semânticos (Etapa 6):** variáveis não definidas só são detectadas em tempo de execução, não antes — não existe uma fase de análise semântica separada da interpretação.
+- **Precedência e associatividade (Etapas 8 e 9):** era o principal problema identificado no projeto original; foi corrigido como a melhoria individual deste trabalho.
+- **Limitações da linguagem em geral, ainda presentes:** não há suporte a números negativos, operadores relacionais (`==`, `<`, `>`, etc.), nem estruturas de controle (`if`, `while`) ou funções — a linguagem suporta apenas declaração de variáveis, expressões aritméticas com os quatro operadores básicos, e `print`.
+
+## Conclusão
+
+Este trabalho permitiu compreender, na prática, o funcionamento interno de um interpretador simples de ponta a ponta: desde a leitura do arquivo-fonte até a execução da AST, passando pela tokenização, construção da árvore sintática e gerenciamento de uma tabela de símbolos. A investigação prática com casos de teste próprios (válidos e inválidos, em cada etapa do pipeline) revelou limitações reais do projeto original que não seriam óbvias apenas lendo o código — em especial, o problema de precedência e associatividade dos operadores aritméticos, confirmado com evidência concreta (comparação entre resultado esperado e obtido em três expressões distintas). A melhoria individual implementada — reestruturação do parser em níveis de precedência (`parse_expression`/`parse_term`/`parse_factor`) — corrigiu esse problema sem introduzir regressões em nenhum dos testes anteriores, demonstrado através de uma bateria de 12 testes de regressão mais um teste combinado novo. O projeto, no seu estado atual (com ou sem a correção implementada), permanece classificado como um interpretador de árvore (*tree-walking interpreter*), não um compilador nem um transpiler, já que não produz nenhuma representação intermediária ou arquivo de saída — ele calcula os resultados diretamente ao percorrer a AST.
+
+## Referências
+
+- DI PAOLA, Rino (ironrinox). *Mini C Compiler*. GitHub, 2025. Disponível em: https://github.com/ironrinox/mini-c-compiler
+- Enunciado da atividade: *Análise da Atividade Individual — Análise do Mini C Compiler*. Disponível em: https://github.com/murilloed/Compiladores_Projetos/blob/main/desafios/COMPILADOR1_Atividade_Individual_Analise_Mini_C_Compiler.md
+- Repositório individual deste trabalho: https://github.com/dutrapedro06/Compiladores
+- Documentação da linguagem C padrão (`stdio.h`, `stdlib.h`, `string.h`, `ctype.h`) — usada para compreender as funções de biblioteca empregadas no projeto original (`fopen`, `malloc`, `strcmp`, `isalpha`, `isdigit`, etc.)
