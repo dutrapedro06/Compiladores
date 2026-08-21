@@ -20,5 +20,5 @@ AST_PRINT
     AST_NUMBER(4)
 
 Program output:
-14
+10
 exit code: 0
