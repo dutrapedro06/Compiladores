@@ -2,10 +2,9 @@
 
 ## Identificação do estudante
 
-- **Nome:** Pedro Dutra
-- **Turma/Instituição:** [preencher]
+- **Nome:** Pedro Pereira Dutra
+- **Turma/Instituição:** [IDP]
 - **Disciplina:** Compiladores
-- **Data de entrega:** [preencher]
 
 ## Identificação do projeto original
 
