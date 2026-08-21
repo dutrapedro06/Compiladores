@@ -1,0 +1,22 @@
+Source code:
+let idade = 30;
+print(idade);
+
+Tokens:
+LET
+IDENT(idade)
+EQUAL
+NUMBER(30)
+SEMICOLON
+PRINT
+IDENT(idade)
+SEMICOLON
+EOF
+
+AST:
+AST_ASSIGN(idade)
+  AST_NUMBER(30)
+
+Program output:
+30
+exit code: 0

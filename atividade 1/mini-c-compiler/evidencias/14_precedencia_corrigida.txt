@@ -1,0 +1,29 @@
+Source code:
+print(20 - 4 - 2 * 3);
+
+
+Tokens:
+PRINT
+NUMBER(20)
+MINUS
+NUMBER(4)
+MINUS
+NUMBER(2)
+MULT
+NUMBER(3)
+SEMICOLON
+EOF
+
+AST:
+AST_PRINT
+  AST_BINARY_OP(-)
+    AST_BINARY_OP(-)
+      AST_NUMBER(20)
+      AST_NUMBER(4)
+    AST_BINARY_OP(*)
+      AST_NUMBER(2)
+      AST_NUMBER(3)
+
+Program output:
+10
+exit code: 0
