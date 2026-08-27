@@ -38,8 +38,17 @@ int eh_palavra_reservada(char lexema[])
     return 0;
 }
 
-void imprimir_token(Token token)
+void imprimir_token(Token token, int *total_tokens, int *total_erros)
 {
+    // toda vez que um token é reconhecido, aumenta o total de tokens
+    (*total_tokens)++;
+
+    // se o token for do tipo erro, também aumenta o total de erros léxicos
+    if (token.tipo == TOKEN_ERRO)
+    {
+        (*total_erros)++;
+    }
+
     printf("Tipo: %d\n", token.tipo);
     printf("Lexema: %s\n", token.lexema);
     printf("Linha: %d\n", token.linha);
@@ -68,6 +77,8 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
     int caractere;
     int linha = 1;
     int coluna = 1;
+    int total_tokens = 0;
+    int total_erros = 0;
 
     while ((caractere = fgetc(arquivo)) != EOF) // enquanto não chegar no final do arquivo (EOF) ele continua
     {
@@ -128,7 +139,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                     token.tipo = TOKEN_IDENTIFICADOR;
                 }
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else if (isdigit(caractere))
@@ -203,7 +214,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                     token.tipo = TOKEN_NUMERO_INTEIRO;
                 }
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else if (caractere == '\'')
@@ -269,7 +280,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                     token.tipo = TOKEN_LITERAL_CARACTERE;
                 }
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else if (caractere == '=' || caractere == '!' || caractere == '<' || caractere == '>')
@@ -309,7 +320,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                 token.linha = linha;
                 token.coluna = coluna_inicial;
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else if (caractere == '&')
@@ -330,7 +341,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                     coluna += 2;
 
-                    imprimir_token(token);
+                    imprimir_token(token, &total_tokens, &total_erros);
                 }
                 else
                 {
@@ -344,7 +355,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                     coluna++;
 
-                    imprimir_token(token);
+                    imprimir_token(token, &total_tokens, &total_erros);
 
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
@@ -372,7 +383,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                     coluna += 2;
 
-                    imprimir_token(token);
+                    imprimir_token(token, &total_tokens, &total_erros);
                 }
                 else
                 {
@@ -386,7 +397,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                     coluna++;
 
-                    imprimir_token(token);
+                    imprimir_token(token, &total_tokens, &total_erros);
 
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
@@ -436,7 +447,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                     coluna++;
 
-                    imprimir_token(token);
+                    imprimir_token(token, &total_tokens, &total_erros);
 
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
@@ -463,7 +474,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                 coluna++;
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else if (caractere == '(' || caractere == ')' || caractere == '{' || caractere == '}' || caractere == '[' || caractere == ']' || caractere == ';' || caractere == ',')
@@ -483,7 +494,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                 coluna++;
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
 
             else
@@ -504,12 +515,13 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                 coluna++;
 
-                imprimir_token(token);
+                imprimir_token(token, &total_tokens, &total_erros);
             }
         }
     }
 
-    printf("\n");
+    printf("Total de tokens: %d\n", total_tokens);
+    printf("Total de erros lexicos: %d\n", total_erros);
 
     fclose(arquivo);
 
