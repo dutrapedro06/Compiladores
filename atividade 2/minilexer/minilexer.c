@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ctype.h>
+#include <string.h>
 
 //o enum nesse caso serve para enumerar os valores de cada token, para que seja mais fácil de identificar (Ex: 0 = token palavra reservada)
 //e definir quais são os tipos de tokens que existem e o lexer vai reconhecer.
@@ -20,6 +21,22 @@ typedef struct { //struct para agrupar as informações que queremos de cada tok
     int linha;
     int coluna;
 } Token;
+
+int eh_palavra_reservada(char lexema[])
+{
+    if (strcmp(lexema, "int") == 0 ||
+        strcmp(lexema, "float") == 0 ||
+        strcmp(lexema, "char") == 0 ||
+        strcmp(lexema, "if") == 0 ||
+        strcmp(lexema, "else") == 0 ||
+        strcmp(lexema, "while") == 0 ||
+        strcmp(lexema, "return") == 0)
+    {
+        return 1;
+    }
+
+    return 0;
+}
 
 int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os argumentos passados
 {
@@ -56,7 +73,7 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
         }
         else
         {
-            if (isalpha(caractere))
+           if (isalpha(caractere) || caractere == '_')
             {
                 char lexema[64];
                 int tamanho = 0;
@@ -64,21 +81,33 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                 lexema[tamanho] = caractere;
                 tamanho++;
 
-                // se tiver lido o caractere e ele for letra ou número, ele continua lendo
-                while ((caractere = fgetc(arquivo)) != EOF && (isalpha(caractere) || isdigit(caractere))) 
+                // enquanto o próximo caractere for letra, número ou _, continua adicionando ao lexema
+                while ((caractere = fgetc(arquivo)) != EOF &&
+                    (isalpha(caractere) || isdigit(caractere) || caractere == '_'))
                 {
-                    lexema[tamanho] = caractere;
-                    tamanho++;
+                    if (tamanho < 63)
+                    {
+                        lexema[tamanho] = caractere;
+                        tamanho++;
+                    }
                 }
 
                 if (caractere != EOF)
                 {
-                    ungetc(caractere, arquivo); // se não for letra nem número, ele coloca o caractere de volta no arquivo para ser lido na próxima volta
+                    ungetc(caractere, arquivo); // se não fizer parte do identificador, coloca o caractere de volta para ser lido na próxima volta
                 }
 
                 lexema[tamanho] = '\0';
 
-                printf("Lexema: %s\n", lexema);
+                // verifica se o lexema encontrado é uma palavra reservada
+                if (eh_palavra_reservada(lexema))
+                {
+                    printf("Palavra reservada: %s\n", lexema);
+                }
+                else
+                {
+                    printf("Identificador: %s\n", lexema);
+                }
             }
 
             else if (isdigit(caractere))
