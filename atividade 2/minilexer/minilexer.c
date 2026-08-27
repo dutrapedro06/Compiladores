@@ -38,6 +38,15 @@ int eh_palavra_reservada(char lexema[])
     return 0;
 }
 
+void imprimir_token(Token token)
+{
+    printf("Tipo: %d\n", token.tipo);
+    printf("Lexema: %s\n", token.lexema);
+    printf("Linha: %d\n", token.linha);
+    printf("Coluna: %d\n", token.coluna);
+    printf("\n");
+}
+
 int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os argumentos passados
 {
     FILE *arquivo;
@@ -73,23 +82,26 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
         }
         else
         {
-           if (isalpha(caractere) || caractere == '_')
+            if (isalpha(caractere) || caractere == '_')
             {
                 char lexema[64];
                 int tamanho = 0;
+                int coluna_inicial = coluna;
 
                 lexema[tamanho] = caractere;
                 tamanho++;
+                coluna++;
 
                 // enquanto o próximo caractere for letra, número ou _, continua adicionando ao lexema
-                while ((caractere = fgetc(arquivo)) != EOF &&
-                    (isalpha(caractere) || isdigit(caractere) || caractere == '_'))
+                while ((caractere = fgetc(arquivo)) != EOF && (isalpha(caractere) || isdigit(caractere) || caractere == '_'))
                 {
                     if (tamanho < 63)
                     {
                         lexema[tamanho] = caractere;
                         tamanho++;
                     }
+
+                    coluna++;
                 }
 
                 if (caractere != EOF)
@@ -99,15 +111,24 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                 lexema[tamanho] = '\0';
 
+                Token token;
+
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                strcpy(token.lexema, lexema);
+
                 // verifica se o lexema encontrado é uma palavra reservada
                 if (eh_palavra_reservada(lexema))
                 {
-                    printf("Palavra reservada: %s\n", lexema);
+                    token.tipo = TOKEN_PALAVRA_RESERVADA;
                 }
                 else
                 {
-                    printf("Identificador: %s\n", lexema);
+                    token.tipo = TOKEN_IDENTIFICADOR;
                 }
+
+                imprimir_token(token);
             }
 
             else if (isdigit(caractere))
@@ -115,28 +136,46 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                 char lexema[64];
                 int tamanho = 0;
                 int numero_real = 0;
+                int coluna_inicial = coluna;
 
                 lexema[tamanho] = caractere;
                 tamanho++;
+                coluna++;
 
                 // enquanto o próximo caractere for um número, continua adicionando ao lexema
                 while ((caractere = fgetc(arquivo)) != EOF && isdigit(caractere))
                 {
-                    lexema[tamanho] = caractere;
-                    tamanho++;
+                    if (tamanho < 63)
+                    {
+                        lexema[tamanho] = caractere;
+                        tamanho++;
+                    }
+
+                    coluna++;
                 }
 
                 // se encontrar um ponto, verifica se o número pode ser real
                 if (caractere == '.')
                 {
                     numero_real = 1;
-                    lexema[tamanho] = caractere;
-                    tamanho++;
 
-                    while ((caractere = fgetc(arquivo)) != EOF && isdigit(caractere))
+                    if (tamanho < 63)
                     {
                         lexema[tamanho] = caractere;
                         tamanho++;
+                    }
+
+                    coluna++;
+
+                    while ((caractere = fgetc(arquivo)) != EOF && isdigit(caractere))
+                    {
+                        if (tamanho < 63)
+                        {
+                            lexema[tamanho] = caractere;
+                            tamanho++;
+                        }
+
+                        coluna++;
                     }
                 }
 
@@ -148,113 +187,164 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
                 lexema[tamanho] = '\0';
 
+                Token token;
+
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                strcpy(token.lexema, lexema);
+
                 if (numero_real)
                 {
-                    printf("Numero real: %s\n", lexema);
+                    token.tipo = TOKEN_NUMERO_REAL;
                 }
                 else
                 {
-                    printf("Numero inteiro: %s\n", lexema);
+                    token.tipo = TOKEN_NUMERO_INTEIRO;
                 }
+
+                imprimir_token(token);
             }
 
-            else if (caractere == '=')
+            else if (caractere == '\'')
             {
-                // lê o próximo caractere para verificar se temos o operador ==
+                char lexema[64];
+                int tamanho = 0;
+                int erro = 0;
+                int coluna_inicial = coluna;
+
+                // adiciona a primeira aspa simples ao lexema
+                lexema[tamanho] = caractere;
+                tamanho++;
+                coluna++;
+
+                // lê o próximo caractere após a aspa
+                caractere = fgetc(arquivo);
+
+                // verifica se o arquivo terminou ou se chegou ao final da linha
+                if (caractere == EOF || caractere == '\n')
+                {
+                    erro = 1;
+                }
+                else
+                {
+                    // continua lendo até encontrar a aspa de fechamento, fim da linha ou fim do arquivo
+                    while (caractere != EOF && caractere != '\n' && tamanho < 63)
+                    {
+                        lexema[tamanho] = caractere;
+                        tamanho++;
+                        coluna++;
+
+                        // se encontrar uma aspa simples, encerra a leitura do literal
+                        if (caractere == '\'')
+                        {
+                            break;
+                        }
+
+                        caractere = fgetc(arquivo);
+                    }
+
+                    // um literal válido deve ter exatamente: 'a'
+                    if (tamanho != 3 || lexema[0] != '\'' || lexema[2] != '\'')
+                    {
+                        erro = 1;
+                    }
+                }
+
+                lexema[tamanho] = '\0';
+
+                Token token;
+
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                strcpy(token.lexema, lexema);
+
+                if (erro)
+                {
+                    token.tipo = TOKEN_ERRO;
+                }
+                else
+                {
+                    token.tipo = TOKEN_LITERAL_CARACTERE;
+                }
+
+                imprimir_token(token);
+            }
+
+            else if (caractere == '=' || caractere == '!' || caractere == '<' || caractere == '>')
+            {
+                char lexema[3];
+                int tamanho = 0;
+                int coluna_inicial = coluna;
+
+                lexema[tamanho] = caractere;
+                tamanho++;
+                coluna++;
+
+                // lê o próximo caractere para verificar se temos um operador com dois caracteres
                 int proximo = fgetc(arquivo);
 
                 if (proximo == '=')
                 {
-                    printf("Operador: ==\n");
+                    lexema[tamanho] = proximo;
+                    tamanho++;
+                    coluna++;
                 }
                 else
                 {
-                    printf("Operador: =\n");
-
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
                     {
                         ungetc(proximo, arquivo);
                     }
                 }
-            }
 
-            else if (caractere == '!')
-            {
-                // lê o próximo caractere para verificar se temos o operador !=
-                int proximo = fgetc(arquivo);
+                lexema[tamanho] = '\0';
 
-                if (proximo == '=')
-                {
-                    printf("Operador: !=\n");
-                }
-                else
-                {
-                    printf("Operador: !\n");
+                Token token;
 
-                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
-                    if (proximo != EOF)
-                    {
-                        ungetc(proximo, arquivo);
-                    }
-                }
-            }
+                token.tipo = TOKEN_OPERADOR;
+                strcpy(token.lexema, lexema);
+                token.linha = linha;
+                token.coluna = coluna_inicial;
 
-            else if (caractere == '<')
-            {
-                // lê o próximo caractere para verificar se temos o operador <=
-                int proximo = fgetc(arquivo);
-
-                if (proximo == '=')
-                {
-                    printf("Operador: <=\n");
-                }
-                else
-                {
-                    printf("Operador: <\n");
-
-                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
-                    if (proximo != EOF)
-                    {
-                        ungetc(proximo, arquivo);
-                    }
-                }
-            }
-
-            else if (caractere == '>')
-            {
-                // lê o próximo caractere para verificar se temos o operador >=
-                int proximo = fgetc(arquivo);
-
-                if (proximo == '=')
-                {
-                    printf("Operador: >=\n");
-                }
-                else
-                {
-                    printf("Operador: >\n");
-
-                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
-                    if (proximo != EOF)
-                    {
-                        ungetc(proximo, arquivo);
-                    }
-                }
+                imprimir_token(token);
             }
 
             else if (caractere == '&')
             {
+                int coluna_inicial = coluna;
+
                 // lê o próximo caractere para verificar se temos o operador &&
                 int proximo = fgetc(arquivo);
 
                 if (proximo == '&')
                 {
-                    printf("Operador: &&\n");
+                    Token token;
+
+                    token.tipo = TOKEN_OPERADOR;
+                    strcpy(token.lexema, "&&");
+                    token.linha = linha;
+                    token.coluna = coluna_inicial;
+
+                    coluna += 2;
+
+                    imprimir_token(token);
                 }
                 else
                 {
-                    // como & sozinho não forma um operador válido, mostra como outro caractere
-                    printf("Outro caractere: &\n");
+                    // como & sozinho não forma um operador válido, ele é considerado um erro
+                    Token token;
+
+                    token.tipo = TOKEN_ERRO;
+                    strcpy(token.lexema, "&");
+                    token.linha = linha;
+                    token.coluna = coluna_inicial;
+
+                    coluna++;
+
+                    imprimir_token(token);
 
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
@@ -266,17 +356,37 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
             else if (caractere == '|')
             {
+                int coluna_inicial = coluna;
+
                 // lê o próximo caractere para verificar se temos o operador ||
                 int proximo = fgetc(arquivo);
 
                 if (proximo == '|')
                 {
-                    printf("Operador: ||\n");
+                    Token token;
+
+                    token.tipo = TOKEN_OPERADOR;
+                    strcpy(token.lexema, "||");
+                    token.linha = linha;
+                    token.coluna = coluna_inicial;
+
+                    coluna += 2;
+
+                    imprimir_token(token);
                 }
                 else
                 {
-                    // como | sozinho não forma um operador válido, mostra como outro caractere
-                    printf("Outro caractere: |\n");
+                    // como | sozinho não forma um operador válido, ele é considerado um erro
+                    Token token;
+
+                    token.tipo = TOKEN_ERRO;
+                    strcpy(token.lexema, "|");
+                    token.linha = linha;
+                    token.coluna = coluna_inicial;
+
+                    coluna++;
+
+                    imprimir_token(token);
 
                     // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
                     if (proximo != EOF)
@@ -288,16 +398,63 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
 
             else if (caractere == '+' || caractere == '-' || caractere == '*' || caractere == '/')
             {
-                printf("Operador: %c\n", caractere);
+                char lexema[2];
+                int coluna_inicial = coluna;
+
+                lexema[0] = caractere;
+                lexema[1] = '\0';
+
+                Token token;
+
+                token.tipo = TOKEN_OPERADOR;
+                strcpy(token.lexema, lexema);
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                coluna++;
+
+                imprimir_token(token);
             }
 
             else if (caractere == '(' || caractere == ')' || caractere == '{' || caractere == '}' || caractere == '[' || caractere == ']' || caractere == ';' || caractere == ',')
             {
-                printf("Delimitador: %c\n", caractere);
+                char lexema[2];
+                int coluna_inicial = coluna;
+
+                lexema[0] = caractere;
+                lexema[1] = '\0';
+
+                Token token;
+
+                token.tipo = TOKEN_DELIMITADOR;
+                strcpy(token.lexema, lexema);
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                coluna++;
+
+                imprimir_token(token);
             }
+
             else
             {
-                printf("Outro caractere: %c\n", caractere);
+                // se o caractere não pertence a nenhum tipo reconhecido pelo lexer, ele é considerado um erro
+                char lexema[2];
+                int coluna_inicial = coluna;
+
+                lexema[0] = caractere;
+                lexema[1] = '\0';
+
+                Token token;
+
+                token.tipo = TOKEN_ERRO;
+                strcpy(token.lexema, lexema);
+                token.linha = linha;
+                token.coluna = coluna_inicial;
+
+                coluna++;
+
+                imprimir_token(token);
             }
         }
     }
