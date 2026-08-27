@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 
 //o enum nesse caso serve para enumerar os valores de cada token, para que seja mais fácil de identificar (Ex: 0 = token palavra reservada)
 //e definir quais são os tipos de tokens que existem e o lexer vai reconhecer.
@@ -20,20 +21,259 @@ typedef struct { //struct para agrupar as informações que queremos de cada tok
     int coluna;
 } Token;
 
-int main(int argc, char *argv[]) { //argc quantidade de argumentos e o argv os argumentos passados
+int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os argumentos passados
+{
     FILE *arquivo;
 
-    if (argc != 2) {
+    if (argc != 2) 
+    {
         printf("Uso correto: minilexer <arquivo-fonte>\n");
         return 1;
     }
 
     arquivo = fopen(argv[1], "r");
 
-    if (arquivo == NULL) {
+    if (arquivo == NULL) 
+    {
         printf("Erro: não foi possível abrir o arquivo, conteudo nulo!\n");
         return 1;
     }
+
+    int caractere;
+    int linha = 1;
+    int coluna = 1;
+
+    while ((caractere = fgetc(arquivo)) != EOF) // enquanto não chegar no final do arquivo (EOF) ele continua
+    {
+        if (caractere == '\n')
+        {
+            linha++;
+            coluna = 1;
+        }
+        else if (caractere == ' ' || caractere == '\t') // se o caractere for espaço ou tabulação, apenas incrementa a coluna
+        {
+            coluna++;
+        }
+        else
+        {
+            if (isalpha(caractere))
+            {
+                char lexema[64];
+                int tamanho = 0;
+
+                lexema[tamanho] = caractere;
+                tamanho++;
+
+                // se tiver lido o caractere e ele for letra ou número, ele continua lendo
+                while ((caractere = fgetc(arquivo)) != EOF && (isalpha(caractere) || isdigit(caractere))) 
+                {
+                    lexema[tamanho] = caractere;
+                    tamanho++;
+                }
+
+                if (caractere != EOF)
+                {
+                    ungetc(caractere, arquivo); // se não for letra nem número, ele coloca o caractere de volta no arquivo para ser lido na próxima volta
+                }
+
+                lexema[tamanho] = '\0';
+
+                printf("Lexema: %s\n", lexema);
+            }
+
+            else if (isdigit(caractere))
+            {
+                char lexema[64];
+                int tamanho = 0;
+                int numero_real = 0;
+
+                lexema[tamanho] = caractere;
+                tamanho++;
+
+                // enquanto o próximo caractere for um número, continua adicionando ao lexema
+                while ((caractere = fgetc(arquivo)) != EOF && isdigit(caractere))
+                {
+                    lexema[tamanho] = caractere;
+                    tamanho++;
+                }
+
+                // se encontrar um ponto, verifica se o número pode ser real
+                if (caractere == '.')
+                {
+                    numero_real = 1;
+                    lexema[tamanho] = caractere;
+                    tamanho++;
+
+                    while ((caractere = fgetc(arquivo)) != EOF && isdigit(caractere))
+                    {
+                        lexema[tamanho] = caractere;
+                        tamanho++;
+                    }
+                }
+
+                if (caractere != EOF)
+                {
+                    // se encontrar um caractere que não faz parte do número, devolve para ser lido depois
+                    ungetc(caractere, arquivo);
+                }
+
+                lexema[tamanho] = '\0';
+
+                if (numero_real)
+                {
+                    printf("Numero real: %s\n", lexema);
+                }
+                else
+                {
+                    printf("Numero inteiro: %s\n", lexema);
+                }
+            }
+
+            else if (caractere == '=')
+            {
+                // lê o próximo caractere para verificar se temos o operador ==
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '=')
+                {
+                    printf("Operador: ==\n");
+                }
+                else
+                {
+                    printf("Operador: =\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '!')
+            {
+                // lê o próximo caractere para verificar se temos o operador !=
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '=')
+                {
+                    printf("Operador: !=\n");
+                }
+                else
+                {
+                    printf("Operador: !\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '<')
+            {
+                // lê o próximo caractere para verificar se temos o operador <=
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '=')
+                {
+                    printf("Operador: <=\n");
+                }
+                else
+                {
+                    printf("Operador: <\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '>')
+            {
+                // lê o próximo caractere para verificar se temos o operador >=
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '=')
+                {
+                    printf("Operador: >=\n");
+                }
+                else
+                {
+                    printf("Operador: >\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '&')
+            {
+                // lê o próximo caractere para verificar se temos o operador &&
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '&')
+                {
+                    printf("Operador: &&\n");
+                }
+                else
+                {
+                    // como & sozinho não forma um operador válido, mostra como outro caractere
+                    printf("Outro caractere: &\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '|')
+            {
+                // lê o próximo caractere para verificar se temos o operador ||
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '|')
+                {
+                    printf("Operador: ||\n");
+                }
+                else
+                {
+                    // como | sozinho não forma um operador válido, mostra como outro caractere
+                    printf("Outro caractere: |\n");
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '+' || caractere == '-' || caractere == '*' || caractere == '/')
+            {
+                printf("Operador: %c\n", caractere);
+            }
+
+            else if (caractere == '(' || caractere == ')' || caractere == '{' || caractere == '}' || caractere == '[' || caractere == ']' || caractere == ';' || caractere == ',')
+            {
+                printf("Delimitador: %c\n", caractere);
+            }
+            else
+            {
+                printf("Outro caractere: %c\n", caractere);
+            }
+        }
+    }
+
+    printf("\n");
 
     fclose(arquivo);
 
