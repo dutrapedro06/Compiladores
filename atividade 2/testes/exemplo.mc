@@ -1,3 +1,9 @@
-int minha_variavel = 10;
-int _contador = 20;
-int numero_1 = 30;
+int numero = 10;
+
+// Este comentário deve ser completamente ignorado
+numero = numero / 2;
+
+// Outro comentário
+if (numero > 3) {
+    numero = numero + 1;
+}

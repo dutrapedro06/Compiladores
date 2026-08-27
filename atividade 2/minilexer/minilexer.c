@@ -396,7 +396,57 @@ int main(int argc, char *argv[]) //argc quantidade de argumentos e o argv os arg
                 }
             }
 
-            else if (caractere == '+' || caractere == '-' || caractere == '*' || caractere == '/')
+            else if (caractere == '/')
+            {
+                // lê o próximo caractere para verificar se temos o início de um comentário //
+                int proximo = fgetc(arquivo);
+
+                if (proximo == '/')
+                {
+                    // como encontramos //, ignora todos os caracteres do comentário
+                    coluna += 2;
+
+                    while ((caractere = fgetc(arquivo)) != EOF && caractere != '\n')
+                    {
+                        coluna++;
+                    }
+
+                    // se o comentário terminou com uma quebra de linha, atualiza a linha e reinicia a coluna
+                    if (caractere == '\n')
+                    {
+                        linha++;
+                        coluna = 1;
+                    }
+                }
+                else
+                {
+                    // se não for comentário, / é reconhecido normalmente como operador
+                    char lexema[2];
+                    int coluna_inicial = coluna;
+
+                    lexema[0] = '/';
+                    lexema[1] = '\0';
+
+                    Token token;
+
+                    token.tipo = TOKEN_OPERADOR;
+                    strcpy(token.lexema, lexema);
+                    token.linha = linha;
+                    token.coluna = coluna_inicial;
+
+                    coluna++;
+
+                    imprimir_token(token);
+
+                    // se o próximo caractere não fizer parte do operador, devolve para ser lido depois
+                    if (proximo != EOF)
+                    {
+                        ungetc(proximo, arquivo);
+                    }
+                }
+            }
+
+            else if (caractere == '+' || caractere == '-' || caractere == '*')
             {
                 char lexema[2];
                 int coluna_inicial = coluna;
