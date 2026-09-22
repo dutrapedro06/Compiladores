@@ -11,7 +11,6 @@ using namespace std;
 class TransformerSimulator
 {
 private:
-    // Vocabulário usado para associar cada token a um ID
     unordered_map<string, int> vocabulario;
     int proximoId;
 
@@ -24,12 +23,22 @@ public:
     vector<string> tokenizar(const string& texto);
     vector<int> gerarIds(const vector<string>& tokens);
     vector<vector<double>> gerarEmbeddings(const vector<int>& ids);
-    vector<vector<double>> adicionarPosicao(const vector<vector<double>>& embeddings);
+    vector<vector<double>> adicionarPosicao(
+        const vector<vector<double>>& embeddings
+    );
 
     // Etapa 7 - Query, Key e Value
-    vector<vector<double>> gerarQuery(const vector<vector<double>>& entrada);
-    vector<vector<double>> gerarKey(const vector<vector<double>>& entrada);
-    vector<vector<double>> gerarValue(const vector<vector<double>>& entrada);
+    vector<vector<double>> gerarQuery(
+        const vector<vector<double>>& entrada
+    );
+
+    vector<vector<double>> gerarKey(
+        const vector<vector<double>>& entrada
+    );
+
+    vector<vector<double>> gerarValue(
+        const vector<vector<double>>& entrada
+    );
 
     // Etapas 8 e 9 - mecanismo de atenção
     vector<vector<double>> calcularAtencao(
@@ -38,12 +47,14 @@ public:
     );
 
     vector<vector<double>> combinarValores(
-        const vector<vector<double>>& pesosAtencao,
+        const vector<vector<double>>& pesos,
         const vector<vector<double>>& value
     );
 
     // Etapa 10 - múltiplas cabeças e camadas
-    vector<vector<double>> gerarSegundaCabeca(const vector<vector<double>>& entrada);
+    vector<vector<double>> gerarSegundaCabeca(
+        const vector<vector<double>>& entrada
+    );
 
     vector<vector<double>> combinarCabecas(
         const vector<vector<double>>& cabeca1,
@@ -66,7 +77,9 @@ public:
         const vector<pair<string, double>>& probabilidades
     );
 
-    vector<string> gerarRespostaProgressiva(const string& resposta);
+    vector<string> gerarRespostaProgressiva(
+        const string& resposta
+    );
 
     // Exibição dos resultados
     void mostrarTokens(const vector<string>& tokens);
