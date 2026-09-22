@@ -6,211 +6,118 @@ using namespace std;
 
 int main()
 {
-    // Cria o simulador
     TransformerSimulator simulador;
 
-    cout << "=============================================\n";
-    cout << " SIMULADOR EDUCACIONAL DE UMA LLM\n";
-    cout << " ARQUITETURA TRANSFORMER\n";
-    cout << "=============================================\n\n";
+    cout << "========================================\n";
+    cout << " SIMULADOR EDUCACIONAL DE TRANSFORMER\n";
+    cout << "========================================\n";
+    cout << "Simulacao educacional simplificada.\n";
+    cout << "Os valores nao representam uma LLM comercial.\n\n";
 
-    cout << "Esta e uma simulacao educacional simplificada.\n";
-    cout << "Os valores nao representam os parametros internos\n";
-    cout << "de uma LLM comercial.\n\n";
-
-
-    // ========================================================
-    // ETAPA 1 - RECEBIMENTO DA FRASE
-    // ========================================================
-
+    // 1 e 2 - Entrada e normalizacao
     string frase = simulador.receberFrase();
+    string texto = simulador.normalizarTexto(frase);
 
-    // Verifica se o usuário digitou alguma coisa
-    if (frase.empty())
+    if (texto.empty())
     {
-        cout << "\nErro: nenhuma frase foi digitada.\n";
+        cout << "Erro: digite uma frase ou pergunta.\n";
         return 0;
     }
 
+    cout << "\n1. FRASE RECEBIDA\n";
+    cout << frase << "\n";
 
-    // ========================================================
-    // ETAPA 2 - NORMALIZAÇÃO
-    // ========================================================
-
-    string textoNormalizado =
-        simulador.normalizarTexto(frase);
-
-    // Verifica novamente porque uma entrada contendo
-    // apenas espaços fica vazia depois da normalização.
-    if (textoNormalizado.empty())
-    {
-        cout << "\nErro: o texto informado esta vazio.\n";
-        return 0;
-    }
-
-    cout << "\n=============================================\n";
-    cout << "ETAPA 2 - TEXTO NORMALIZADO\n";
-    cout << "=============================================\n";
-
-    cout << textoNormalizado << "\n";
+    cout << "\n2. TEXTO NORMALIZADO\n";
+    cout << texto << "\n";
 
 
-    // ========================================================
-    // ETAPA 3 - TOKENIZAÇÃO
-    // ========================================================
+    // 3 e 4 - Tokens e IDs
+    vector<string> tokens = simulador.tokenizar(texto);
+    vector<int> ids = simulador.gerarIds(tokens);
 
-    vector<string> tokens =
-        simulador.tokenizar(textoNormalizado);
-
-    cout << "\n=============================================\n";
-    cout << "ETAPA 3 - TOKENIZACAO\n";
-    cout << "=============================================\n";
-
+    cout << "\n3. TOKENIZACAO\n";
     simulador.mostrarTokens(tokens);
 
-
-    // ========================================================
-    // ETAPA 4 - CONVERSÃO PARA IDs
-    // ========================================================
-
-    vector<int> ids =
-        simulador.gerarIds(tokens);
-
-    cout << "\n=============================================\n";
-    cout << "ETAPA 4 - TOKENS E IDs\n";
-    cout << "=============================================\n";
-
+    cout << "\n4. TOKENS PARA IDs\n";
     simulador.mostrarIds(tokens, ids);
 
 
-    // ========================================================
-    // ETAPA 5 - EMBEDDINGS
-    // ========================================================
-
+    // 5 - Embeddings
     vector<vector<double>> embeddings =
         simulador.gerarEmbeddings(ids);
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 5 - EMBEDDINGS\n";
-    cout << "=============================================\n";
-
+    cout << "\n5. EMBEDDINGS\n";
     cout << "Embedding didatico simulado.\n";
-    cout << "Os valores nao representam embeddings reais.\n";
 
     simulador.mostrarVetores(
         tokens,
         embeddings,
-        "EMBEDDINGS DIDATICOS"
+        "EMBEDDINGS"
     );
 
 
-    // ========================================================
-    // ETAPA 6 - INFORMAÇÃO DE POSIÇÃO
-    // ========================================================
-
-    vector<vector<double>> entradaComPosicao =
+    // 6 - Informacao de posicao
+    vector<vector<double>> entrada =
         simulador.adicionarPosicao(embeddings);
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 6 - INFORMACAO DE POSICAO\n";
-    cout << "=============================================\n";
+    cout << "\n6. INFORMACAO DE POSICAO\n";
 
     simulador.mostrarVetores(
         tokens,
-        entradaComPosicao,
+        entrada,
         "EMBEDDING + POSICAO"
     );
 
 
-    // ========================================================
-    // ETAPA 7 - QUERY, KEY E VALUE
-    // ========================================================
+    // 7 - Query, Key e Value
+    vector<vector<double>> Q =
+        simulador.gerarQuery(entrada);
 
-    vector<vector<double>> query =
-        simulador.gerarQuery(entradaComPosicao);
+    vector<vector<double>> K =
+        simulador.gerarKey(entrada);
 
-    vector<vector<double>> key =
-        simulador.gerarKey(entradaComPosicao);
+    vector<vector<double>> V =
+        simulador.gerarValue(entrada);
 
-    vector<vector<double>> value =
-        simulador.gerarValue(entradaComPosicao);
+    cout << "\n7. QUERY, KEY E VALUE\n";
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 7 - QUERY, KEY E VALUE\n";
-    cout << "=============================================\n";
-
-    simulador.mostrarVetores(
-        tokens,
-        query,
-        "QUERY (Q)"
-    );
-
-    simulador.mostrarVetores(
-        tokens,
-        key,
-        "KEY (K)"
-    );
-
-    simulador.mostrarVetores(
-        tokens,
-        value,
-        "VALUE (V)"
-    );
+    simulador.mostrarVetores(tokens, Q, "QUERY (Q)");
+    simulador.mostrarVetores(tokens, K, "KEY (K)");
+    simulador.mostrarVetores(tokens, V, "VALUE (V)");
 
 
-    // ========================================================
-    // ETAPA 8 - PESOS DE ATENÇÃO
-    // ========================================================
+    // 8 - Pesos de atencao
+    vector<vector<double>> pesos =
+        simulador.calcularAtencao(Q, K);
 
-    vector<vector<double>> pesosAtencao =
-        simulador.calcularAtencao(
-            query,
-            key
-        );
-
-    cout << "\n=============================================\n";
-    cout << "ETAPA 8 - PESOS DE ATENCAO\n";
-    cout << "=============================================\n";
-
-    simulador.mostrarAtencao(
-        tokens,
-        pesosAtencao
-    );
+    cout << "\n8. PESOS DE ATENCAO\n";
+    simulador.mostrarAtencao(tokens, pesos);
 
 
-    // ========================================================
-    // ETAPA 9 - COMBINAÇÃO DOS VALUES
-    // ========================================================
-
+    // 9 - Combinacao dos Values
     vector<vector<double>> cabeca1 =
-        simulador.combinarValores(
-            pesosAtencao,
-            value
-        );
+        simulador.combinarValores(pesos, V);
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 9 - COMBINACAO DOS VALUES\n";
-    cout << "=============================================\n";
+    cout << "\n9. COMBINACAO DOS VALUES\n";
 
     simulador.mostrarVetores(
         tokens,
         cabeca1,
-        "RESULTADO DA CABECA 1"
+        "SAIDA DA CABECA 1"
     );
 
 
-    // ========================================================
-    // ETAPA 10 - SEGUNDA CABEÇA DE ATENÇÃO
-    // ========================================================
-
+    // 10 - Multi-head e camadas
     vector<vector<double>> cabeca2 =
-        simulador.gerarSegundaCabeca(
-            entradaComPosicao
+        simulador.gerarSegundaCabeca(entrada);
+
+    vector<vector<double>> multiHead =
+        simulador.combinarCabecas(
+            cabeca1,
+            cabeca2
         );
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 10 - MULTI-HEAD ATTENTION\n";
-    cout << "=============================================\n";
+    cout << "\n10. MULTI-HEAD ATTENTION\n";
 
     simulador.mostrarVetores(
         tokens,
@@ -224,147 +131,80 @@ int main()
         "CABECA 2"
     );
 
-
-    // Combina as duas cabeças
-    vector<vector<double>> cabecasCombinadas =
-        simulador.combinarCabecas(
-            cabeca1,
-            cabeca2
-        );
-
     simulador.mostrarVetores(
         tokens,
-        cabecasCombinadas,
-        "RESULTADO DAS CABECAS COMBINADAS"
+        multiHead,
+        "CABECAS COMBINADAS"
     );
-
-
-    // ========================================================
-    // ETAPA 10 - TRÊS CAMADAS SIMULADAS
-    // ========================================================
 
     vector<vector<vector<double>>> camadas =
-        simulador.processarCamadas(
-            cabecasCombinadas
-        );
+        simulador.processarCamadas(multiHead);
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 10 - CAMADAS DO TRANSFORMER\n";
-    cout << "=============================================\n";
-
-    simulador.mostrarCamadas(
-        tokens,
-        camadas
-    );
+    simulador.mostrarCamadas(tokens, camadas);
 
 
-    // ========================================================
-    // ETAPA 11 - RESPOSTA DIDÁTICA
-    // ========================================================
-
+    // Resposta didatica usada pela simulacao
     string resposta =
-        simulador.obterRespostaDidatica(
-            textoNormalizado
-        );
+        simulador.obterRespostaDidatica(texto);
 
     vector<string> tokensResposta =
         simulador.tokenizar(resposta);
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 11 - PREVISAO DO PROXIMO TOKEN\n";
-    cout << "=============================================\n";
+
+    // 11 e 12 - Probabilidades e selecao
+    cout << "\n11. PROBABILIDADES DO PROXIMO TOKEN\n";
+
+    vector<pair<string, double>> probs =
+        simulador.calcularProbabilidades(
+            tokensResposta,
+            0
+        );
+
+    simulador.mostrarProbabilidades(probs);
+
+    cout << "\n12. TOKEN SELECIONADO\n";
+    cout << simulador.selecionarProximoToken(probs)
+         << "\n";
 
 
-    // ========================================================
-    // ETAPAS 11, 12 E 13
-    // PROBABILIDADES + GREEDY + GERAÇÃO AUTOREGRESSIVA
-    // ========================================================
+    // 13 - Geracao progressiva
+    cout << "\n13. GERACAO PROGRESSIVA\n";
 
-    string respostaConstruida;
+    vector<string> etapas =
+        simulador.gerarRespostaProgressiva(resposta);
 
-    vector<string> tokensGerados;
-
-    for (int i = 0; i < tokensResposta.size(); i++)
+    for (int i = 0; i < etapas.size(); i++)
     {
-        cout << "\n---------------------------------------------\n";
-        cout << "PASSO DE GERACAO " << i + 1 << "\n";
-        cout << "---------------------------------------------\n";
-
-        // Calcula as probabilidades dos candidatos
-        vector<pair<string, double>> probabilidades =
-            simulador.calcularProbabilidades(
-                tokensResposta,
-                i
-            );
-
-        simulador.mostrarProbabilidades(
-            probabilidades
-        );
-
-        // Estratégia Greedy:
-        // seleciona o token com maior probabilidade
-        string proximoToken =
-            simulador.selecionarProximoToken(
-                probabilidades
-            );
-
-        cout << "\nToken selecionado: "
-             << proximoToken
-             << "\n";
-
-        tokensGerados.push_back(
-            proximoToken
-        );
-
-        // Evita colocar espaço antes das pontuações
-        if (
-            proximoToken == "." ||
-            proximoToken == "," ||
-            proximoToken == "?" ||
-            proximoToken == "!" ||
-            proximoToken == ";" ||
-            proximoToken == ":")
-        {
-            respostaConstruida += proximoToken;
-        }
-        else
-        {
-            if (!respostaConstruida.empty())
-            {
-                respostaConstruida += " ";
-            }
-
-            respostaConstruida += proximoToken;
-        }
-
-        cout << "Resposta parcial: "
-             << respostaConstruida
+        cout << "Passo "
+             << i + 1
+             << ": "
+             << etapas[i]
              << "\n";
     }
 
 
-    // ========================================================
-    // ETAPA 14 - RESPOSTA FINAL
-    // ========================================================
+    // Tokens efetivamente gerados
+    vector<string> tokensGerados =
+        simulador.tokenizar(
+            etapas.empty() ? "" : etapas.back()
+        );
 
-    cout << "\n=============================================\n";
-    cout << "ETAPA 14 - RESPOSTA FINAL\n";
-    cout << "=============================================\n";
-
-    cout << respostaConstruida << "\n";
+    string respostaFinal =
+        etapas.empty() ? "" : etapas.back();
 
 
-    // ========================================================
-    // RESUMO FINAL DA SIMULAÇÃO
-    // ========================================================
+    // 14 - Resposta final
+    cout << "\n14. RESPOSTA FINAL\n";
+    cout << respostaFinal << "\n";
 
+
+    // Resumo da simulacao
     simulador.mostrarResumo(
         frase,
         tokens,
         tokensGerados,
-        respostaConstruida
+        respostaFinal
     );
-
 
     return 0;
 }
